@@ -10,6 +10,7 @@ var express = require('express')
   , path = require('path');
 
 var app = express();
+var modules = require('./modules/modules.json');
 
 // development environment
 app.configure('development', function(){
@@ -38,9 +39,31 @@ if ('development' == app.get('env')) {
 // unless otherwise handled by some module from modules.json
 app.get('/', home.home);
 
-// check the modules.json if any modules support handling of this route
-//app.get(/^(?!^\/$).*$/, backend.backend); // Dangerous and overrides everything
-app.get("/:modulename", backend.backend);
+// initialize and load routing rules for all modules
+modules.kingdoms.forEach(function(kingdom) {
+
+    // initialize the module
+    var modInit = require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
+    try {
+        modInit.init(app);
+    } catch (err){
+        console.log("Error occured in initializing module %s", kingdom.name);
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+    }
+
+    // configure the module's defined routes
+    try {
+        app.use('/' + kingdom.name,
+            require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
+    } catch (err) {
+        console.log("Error occured in loading %s's entry", kingdom.name);
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+    }
+})
 
 // match everything and display 404 <- lowest priority middleware
 // TODO: do not allow any other kind of GET requests?
