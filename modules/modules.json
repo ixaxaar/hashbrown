@@ -1,0 +1,36 @@
+{
+    "name": "realm",
+    "kingdoms": [
+        {
+            "name":         "kingslanding",
+            "version":      "0.0.1",
+            "dirName":      "kingslanding",
+            "scripts":      {
+                "entry":        "entry.js",
+                "init":         "init.js",
+                "exit":         "exit.js",
+                "install":      "install.js",
+                "uninstall":    "uninstall.js"
+            },
+            "dependencies": {
+                "hashbrown":    "*"
+            }
+        },
+        {
+            "name":         "winterfell",
+            "version":      "0.0.1",
+            "dirName":      "winterfell",
+            "scripts":      {
+                "entry":        "entry.js",
+                "init":         "init.js",
+                "exit":         "exit.js",
+                "install":      "install.js",
+                "uninstall":    "uninstall.js"
+            },
+            "dependencies": {
+                "hashbrown":    "*",
+                "kingslanding": "*"
+            }
+        }
+    ]
+}
