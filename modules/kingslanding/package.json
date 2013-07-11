@@ -1,0 +1,16 @@
+{
+    "name":         "kingslanding",
+    "version":      "0.0.1",
+    "dirName":      "kingslanding",
+    "enabled":      true,
+    "scripts":      {
+        "entry":        "entry.js",
+        "init":         "init.js",
+        "exit":         "exit.js",
+        "install":      "install.js",
+        "uninstall":    "uninstall.js"
+    },
+    "dependencies": {
+        "hashbrown":    "*"
+    }
+}
