@@ -5,6 +5,7 @@
             "name":         "kingslanding",
             "version":      "0.0.1",
             "dirName":      "kingslanding",
+            "enabled":      true,
             "scripts":      {
                 "entry":        "entry.js",
                 "init":         "init.js",
@@ -20,6 +21,7 @@
             "name":         "winterfell",
             "version":      "0.0.1",
             "dirName":      "winterfell",
+            "enabled":      true,
             "scripts":      {
                 "entry":        "entry.js",
                 "init":         "init.js",

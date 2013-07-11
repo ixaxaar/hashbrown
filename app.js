@@ -42,31 +42,34 @@ app.get('/', home.home);
 // initialize and load routing rules for all modules
 modules.kingdoms.forEach(function(kingdom) {
 
-    // initialize the module
-    var modInit = require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
-    try {
-        modInit.init(app);
-    } catch (err){
-        console.log("Error occured in initializing module %s", kingdom.name);
-        if ('development' == app.get('env')) {
-            throw err;
+    if (kingdom.enabled)
+    {
+        // initialize the module
+        var modInit = require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
+        try {
+            modInit.init();
+        } catch (err) {
+            console.log("Error occured in initializing module %s", kingdom.name);
+            if ('development' == app.get('env')) {
+                throw err;
+            }
         }
-    }
 
-    // configure the module's defined routes
-    try {
-        app.use('/' + kingdom.name,
-            require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
-    } catch (err) {
-        console.log("Error occured in loading %s's entry", kingdom.name);
-        if ('development' == app.get('env')) {
-            throw err;
+        // configure the module's defined routes
+        try {
+            app.use('/' + kingdom.name,
+                require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
+        } catch (err) {
+            console.log("Error occured in loading %s's entry", kingdom.name);
+            if ('development' == app.get('env')) {
+                throw err;
+            }
         }
     }
 })
 
 // match everything and display 404 <- lowest priority middleware
-// TODO: do not allow any other kind of GET requests?
+// TODO: do not allow any other kind of GET requests? - after this all further route configuration will be disabled!
 app.use(function(req, res){
     res.send(404);
 })
