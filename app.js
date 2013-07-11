@@ -10,7 +10,6 @@ var express = require('express')
   , path = require('path');
 
 var app = express();
-var modules = require('./modules/modules.json');
 
 // development environment
 app.configure('development', function(){
@@ -35,36 +34,23 @@ if ('development' == app.get('env')) {
   app.use(express.errorHandler());
 }
 
+
+// load modules.json
+var kingdoms = backend.getKingdoms(app);
+if (!kingdoms) {
+    err = "FATAL: Could not load modules";
+    throw err;
+}
+
 /** Routing: default routing except home goes to 404 */
 // unless otherwise handled by some module from modules.json
 app.get('/', home.home);
 
 // initialize and load routing rules for all modules
-modules.kingdoms.forEach(function(kingdom) {
-
-    if (kingdom.enabled)
-    {
-        // initialize the module
-        var modInit = require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
-        try {
-            modInit.init();
-        } catch (err) {
-            console.log("Error occured in initializing module %s", kingdom.name);
-            if ('development' == app.get('env')) {
-                throw err;
-            }
-        }
-
-        // configure the module's defined routes
-        try {
-            app.use('/' + kingdom.name,
-                require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
-        } catch (err) {
-            console.log("Error occured in loading %s's entry", kingdom.name);
-            if ('development' == app.get('env')) {
-                throw err;
-            }
-        }
+kingdoms.forEach(function(kingdom) {
+    if (backend.isEnabled(app, kingdom)) {
+        backend.initKingdom(app, kingdom);
+        backend.enterKingdom(app, kingdom);
     }
 })
 

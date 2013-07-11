@@ -4,23 +4,73 @@
  * Time: 10:51 PM
  */
 
-/**
- * @function enableKingdom
- * @description Enable a module / kingdom
- * @param kingdom
- */
-exports.enableKingdom = function(kingdom){
-    try{
-        kingdom.enabled = true;
+// gloooobal :O
+var realm = require(process.cwd() + '/modules/modules.json');
+
+
+exports.getKingdoms = function(app) {
+    try {
+        var kingdoms = [];
+        realm.kingdoms.forEach(function(kingdom) {
+            kingdoms.push(kingdom.name);
+        })
+        return kingdoms;
     } catch (err) {
-        console.log("Error occured while enabling module");
+        console.log("Error occured while fetching modules.json");
         if ('development' == app.get('env')) {
             throw err;
         }
         return false;
     }
+}
 
-    return true;
+
+exports.isEnabled = function(app, kingdomName) {
+    var ret = false;
+    try {
+        realm.kingdoms.forEach(function(kingdom) {
+            if (kingdom.name == kingdomName) {
+                if (kingdom.enabled == true) {
+                    ret = true;
+                }
+            }
+        })
+    } catch (err) {
+        console.log("Error occured while enabling module");
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+    }
+
+    return ret;
+}
+
+/**
+ * @function enableKingdom
+ * @description Enable a module / kingdom
+ * @param app
+ * @param modules
+ * @param kingdom
+ * @returns {boolean}
+ */
+exports.enableKingdom = function(app, kingdomName) {
+    var ret = false;
+    try {
+        realm.kingdoms.forEach(function(kingdom) {
+            if (kingdom.name == kingdomName) {
+                kingdom.enabled = true;
+                ret = true;
+            }
+        })
+        this.syncExports(app, realm);
+    } catch (err) {
+        console.log("Error occured while enabling module");
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+    }
+
+    return ret;
 }
 
 /**
@@ -29,18 +79,25 @@ exports.enableKingdom = function(kingdom){
  * @param kingdom
  * @returns {boolean}
  */
-exports.disableKingdom = function(kingdom){
-    try{
-        kingdom.enabled = false;
+exports.disableKingdom = function(app, kingdomName){
+    var ret = false;
+    try {
+        realm.kingdoms.forEach(function(kingdom) {
+            if (kingdom.name == kingdomName) {
+                kingdom.enabled = false;
+                this.leaveKingdom(app, kingdomName);
+                ret = true;
+            }
+        })
+        this.syncExports(app, realm);
     } catch (err) {
-        console.log("Error occured while enabling module");
+        console.log("Error occured while disabling module");
         if ('development' == app.get('env')) {
             throw err;
         }
-        return false;
     }
 
-    return true;
+    return ret;
 }
 
 
@@ -50,18 +107,24 @@ exports.disableKingdom = function(kingdom){
  * @param kingdom
  * @returns {boolean}
  */
-exports.initKingdom = function(kingdom){
+exports.initKingdom = function(app, kingdomName){
+    var ret = false;
     try {
-        kingdom.init();
+        realm.kingdoms.forEach(function(kingdom) {
+            if (kingdom.name == kingdomName) {
+                var modInit = require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
+                modInit.init();
+                ret = true;
+            }
+        })
     } catch (err) {
-        console.log("Error occured in initializing module %s", kingdom.name);
+        console.log("Error occured in initializing module");
         if ('development' == app.get('env')) {
             throw err;
         }
-        return false;
     }
 
-    return true;
+    return ret;
 }
 
 /**
@@ -71,19 +134,24 @@ exports.initKingdom = function(kingdom){
  * @param app
  * @returns {boolean}
  */
-exports.enterKingdom = function(kingdom, app){
+exports.enterKingdom = function(app, kingdomName){
+    var ret = false;
     try {
-        app.use('/' + kingdom.name,
-            require('./modules/' + kingdom.dirName + '/' + kingdom.scripts.entry)); // TODO: from present dir?
+        realm.kingdoms.forEach(function(kingdom) {
+            if (kingdom.name == kingdomName) {
+                app.use('/' + kingdom.name,
+                    require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
+                ret = true;
+            }
+        })
     } catch (err) {
         console.log("Error occured in loading %s's entry", kingdom.name);
         if ('development' == app.get('env')) {
             throw err;
         }
-        return false;
     }
 
-    return true;
+    return ret;
 }
 
 /**
@@ -109,7 +177,7 @@ exports.leaveKingdom = function(kingdom, app){
 
     // execute the module's custom uninit routine, allow it to exit cleanly
     try {
-        kingdom.exit();
+        kingdom.uninit();
     } catch (err) {
         console.log("Error occured in un-initializing module %s", kingdom.name);
         if ('development' == app.get('env')) {
@@ -141,14 +209,30 @@ exports.destroyKingdom = function(kingdom, modules){
     //
 }
 
+
 /**
- * @function syncExports
- * @description Sync provided JSON file with provided javascript variable
+ * @description Sync (blocking) provided JSON file with provided javascript variable
  * @param jsonVariable
  * @param jsonFile
+ * @returns {boolean}
  */
-exports.syncExports = function(jsonVariable, jsonFile){
+exports.syncExports = function(app, jsonVariable, jsonFile){
+    if (!jsonFile) {
+        jsonFile = process.cwd() + '/modules/modules.json';
+    }
 
+    try{
+        fs = require("fs");
+        fs.writeFileSync(jsonFile, JSON.stringify(jsonVariable, null, 2));
+    } catch (err) {
+        console.log("Could not update modules.json");
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+        return false;
+    }
+
+    return true;
 }
 
 exports.exposeAPI = function(apiName, apiModule, funcHandle){
@@ -163,6 +247,6 @@ exports.queryAPI = function(apiName){
 //    return apiModule;
 }
 
-exports.gethandleofAPI = function(apiName, apiModule){
+exports.getAPI = function(apiName, apiModule){
     //
 }
