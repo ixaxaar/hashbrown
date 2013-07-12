@@ -63,8 +63,6 @@ setTimeout(function(){
 // chuck the rest into the narrow sea of 404's
 backend.narrowSea(app, fournotfour);
 
-console.log(app.stack.length);
-
 http.createServer(app).listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));
 });

@@ -33,7 +33,6 @@ exports.narrowSea = function(app, func) {
         }
     }
 
-    narrowSeaRoute = app.stack.length;
     app.use(narrowSea);
 }
 
@@ -72,6 +71,17 @@ exports.isEnabled = function(app, kingdomName) {
     }
 
     return ret;
+}
+
+_removeNarrowSea = function (app) {
+    var i = 0;
+
+    app.stack.forEach(function(stack) {
+        if (stack.handle == narrowSea) {
+            app.stack.remove(i);
+        }
+        i++;
+    })
 }
 
 exports.enableKingdom = function(app, kingdomName) {
@@ -143,7 +153,8 @@ exports.enterKingdom = function(app, kingdomName){
 
     try {
         realm.kingdoms.forEach(function(kingdom) {
-        if (kingdom.name == kingdomName) {
+            if (kingdom.name == kingdomName) {
+                // add the routing middleware
                 app.use('/' + kingdom.name,
                     require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
                 ret = true;
@@ -159,7 +170,6 @@ exports.enterKingdom = function(app, kingdomName){
     return ret;
 }
 
-
 exports.leaveKingdom = function(app, kingdomName){
     var ret = false;
     var i = 0;
@@ -172,10 +182,12 @@ exports.leaveKingdom = function(app, kingdomName){
 
                 // remove this module's route
                 app.stack.forEach(function(stack){
-                    if (stack.route == ('/' + kingdom.name)) app.stack.remove(i);
+                    if (stack.route == ('/' + kingdom.name)){
+                        app.stack.remove(i);
+                        ret = true;
+                    }
                     i++;
                 })
-                ret = true;
             }
         })
     } catch (err) {
@@ -189,8 +201,40 @@ exports.leaveKingdom = function(app, kingdomName){
 }
 
 
-exports.createKingdom = function(rootDir, modules){
-    //
+exports.createKingdom = function(app, rootDir, modules){
+    var ret = false;
+
+    try {
+        var fs = require('fs');
+        rootDir = process.getcwd() + '/modules/' + rootDir;
+        var rootJson = rootDir + '/package.json';
+
+        if (fs.existsSync(rootDir)) {
+            if (fs.existsSync(rootJson)) {
+                var newPackage = require(rootJson);
+
+                // check if the package already exists, if it does not, add the
+                // new json part to modules.json
+                if (!function () {
+                    modules.kingdoms.forEach(function(kingdom) {
+                        if (kingdom.name == rootJson.name) return true;
+                    })
+                    return false;
+                }) {
+                    modules.kingdoms[modules.kingdoms.length] = rootJson;
+                    this.syncExports(app, modules);
+                    ret = true;
+                }
+            }
+        }
+    } catch (err) {
+        console.log("Could not create a new kingdom");
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+    }
+
+    return ret;
 }
 
 
