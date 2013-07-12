@@ -7,6 +7,35 @@
 // gloooobal :O
 var realm = require(process.cwd() + '/modules/modules.json');
 
+// the 404 function
+var narrowSea = function(req, res) {
+    res.send(404);
+}
+
+// 404 default route number
+var narrowSeaRoute = 0;
+
+// Array Remove - By John Resig (MIT Licensed)
+Array.prototype.remove = function(from, to) {
+    var rest = this.slice((to || from) + 1 || this.length);
+    this.length = from < 0 ? this.length + from : from;
+    return this.push.apply(this, rest);
+};
+
+
+exports.narrowSea = function(app, func) {
+    try {
+        narrowSea = func;
+    } catch (err) {
+        console.log("Could not register 404 function");
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+    }
+
+    narrowSeaRoute = app.stack.length;
+    app.use(narrowSea);
+}
 
 exports.getKingdoms = function(app) {
     try {
@@ -45,14 +74,6 @@ exports.isEnabled = function(app, kingdomName) {
     return ret;
 }
 
-/**
- * @function enableKingdom
- * @description Enable a module / kingdom
- * @param app
- * @param modules
- * @param kingdom
- * @returns {boolean}
- */
 exports.enableKingdom = function(app, kingdomName) {
     var ret = false;
     try {
@@ -73,12 +94,7 @@ exports.enableKingdom = function(app, kingdomName) {
     return ret;
 }
 
-/**
- * @function disableKingdom
- * @description Disable a module / kingdom
- * @param kingdom
- * @returns {boolean}
- */
+
 exports.disableKingdom = function(app, kingdomName){
     var ret = false;
     try {
@@ -101,12 +117,6 @@ exports.disableKingdom = function(app, kingdomName){
 }
 
 
-/**
- * @function initKingdom
- * @description Initialize a module / kingdom
- * @param kingdom
- * @returns {boolean}
- */
 exports.initKingdom = function(app, kingdomName){
     var ret = false;
     try {
@@ -127,25 +137,20 @@ exports.initKingdom = function(app, kingdomName){
     return ret;
 }
 
-/**
- * @function enterKingdom
- * @description Create a module / kingdom's routes
- * @param kingdom
- * @param app
- * @returns {boolean}
- */
+
 exports.enterKingdom = function(app, kingdomName){
     var ret = false;
+
     try {
         realm.kingdoms.forEach(function(kingdom) {
-            if (kingdom.name == kingdomName) {
+        if (kingdom.name == kingdomName) {
                 app.use('/' + kingdom.name,
                     require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
                 ret = true;
             }
         })
     } catch (err) {
-        console.log("Error occured in loading %s's entry", kingdom.name);
+        console.log("Error occured in loading entry");
         if ('development' == app.get('env')) {
             throw err;
         }
@@ -154,73 +159,53 @@ exports.enterKingdom = function(app, kingdomName){
     return ret;
 }
 
-/**
- * @function leaveKingdom
- * @description Uninit a module / kingdom's routes
- * @param kingdom
- * @param app
- * @returns {boolean}
- */
-exports.leaveKingdom = function(kingdom, app){
-    // Un-define all routing rules that might have been specified by the module
+
+exports.leaveKingdom = function(app, kingdomName){
+    var ret = false;
+    var i = 0;
+
     try {
-        app.use('/' + kingdom.name, function(req, res) {
-            res.send(404);
-        });
+        realm.kingdoms.forEach(function(kingdom) {
+            if (kingdom.name == kingdomName) {
+                // execute the module's custom uninit routine, allow it to exit cleanly
+                require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.uninit).uninit();
+
+                // remove this module's route
+                app.stack.forEach(function(stack){
+                    if (stack.route == ('/' + kingdom.name)) app.stack.remove(i);
+                    i++;
+                })
+                ret = true;
+            }
+        })
     } catch (err) {
-        console.log("Error occured in un-initializing module %s's routes", kingdom.name);
+        console.log("Error occured in un-initializing module's routes");
         if ('development' == app.get('env')) {
             throw err;
         }
-        return false;
     }
 
-    // execute the module's custom uninit routine, allow it to exit cleanly
-    try {
-        kingdom.uninit();
-    } catch (err) {
-        console.log("Error occured in un-initializing module %s", kingdom.name);
-        if ('development' == app.get('env')) {
-            throw err;
-        }
-        return false;
-    }
-
-    return true;
+    return ret;
 }
 
-/**
- * @function createKingdom
- * @description Create a new kingdom - install a module
- * @param rootDir
- * @param modules
- */
+
 exports.createKingdom = function(rootDir, modules){
     //
 }
 
-/**
- * @function destroyKingdom
- * @description Destroy a new kingdom - uninstall a module
- * @param kingdom
- * @param modules
- */
+
 exports.destroyKingdom = function(kingdom, modules){
     //
 }
 
 
-/**
- * @description Sync (blocking) provided JSON file with provided javascript variable
- * @param jsonVariable
- * @param jsonFile
- * @returns {boolean}
- */
 exports.syncExports = function(app, jsonVariable, jsonFile){
     if (!jsonFile) {
         jsonFile = process.cwd() + '/modules/modules.json';
     }
-
+    if (!jsonVariable) {
+        jsonVariable = realm;
+    }
     try{
         fs = require("fs");
         fs.writeFileSync(jsonFile, JSON.stringify(jsonVariable, null, 2));

@@ -5,6 +5,7 @@
 
 var express = require('express')
   , backend = require('./routes/backend')
+  , fournotfour =  require('./routes/fournotfour')
   , home = require('./routes/home')
   , http = require('http')
   , path = require('path');
@@ -34,7 +35,6 @@ if ('development' == app.get('env')) {
   app.use(express.errorHandler());
 }
 
-
 // load modules.json
 var kingdoms = backend.getKingdoms(app);
 if (!kingdoms) {
@@ -54,11 +54,16 @@ kingdoms.forEach(function(kingdom) {
     }
 })
 
-// match everything and display 404 <- lowest priority middleware
-// TODO: do not allow any other kind of GET requests? - after this all further route configuration will be disabled!
-app.use(function(req, res){
-    res.send(404);
-})
+setTimeout(function(){
+    console.log('hit');
+    backend.leaveKingdom(app, 'kingslanding');
+}, 10000);
+
+
+// chuck the rest into the narrow sea of 404's
+backend.narrowSea(app, fournotfour);
+
+console.log(app.stack.length);
 
 http.createServer(app).listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));
