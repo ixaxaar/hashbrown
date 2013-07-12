@@ -217,11 +217,11 @@ exports.createKingdom = function(app, rootDir, modules){
                 // new json part to modules.json
                 if (!function () {
                     modules.kingdoms.forEach(function(kingdom) {
-                        if (kingdom.name == rootJson.name) return true;
+                        if (kingdom.name == newPackage.name) return true;
                     })
                     return false;
                 }) {
-                    modules.kingdoms[modules.kingdoms.length] = rootJson;
+                    modules.kingdoms[modules.kingdoms.length] = newPackage;
                     this.syncExports(app, modules);
                     ret = true;
                 }
@@ -264,12 +264,39 @@ exports.syncExports = function(app, jsonVariable, jsonFile){
     return true;
 }
 
-exports.exposeAPI = function(apiName, apiModule, funcHandle){
-    //
+exports.ExposedAPIs = [];
+
+exports.exposeAPI = function(apiName, apiModule, apiHandle){
+    var ret = false;
+
+    try {
+        //check if api name is taken
+        if (function() {
+            this.ExposedAPIs.forEach(function(api) {
+                if ((api.name == apiName) && (api.module == apiModule)) return false;
+            });
+            return true;
+        }) {
+            // add the api
+            this.ExposedAPIs[this.ExposedAPIs.length] = {
+                'name'      : apiName,
+                'module'    : apiModule,
+                'handle'    : apiHandle
+            };
+            ret = true;
+        }
+    } catch (err) {
+        console.log("Could not expose API");
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+    }
+
+    return ret;
 }
 
 exports.unexposeAPI = function(apiName, apiModule){
-    //
+
 }
 
 exports.queryAPI = function(apiName){
