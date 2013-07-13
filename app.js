@@ -54,10 +54,19 @@ kingdoms.forEach(function(kingdom) {
     }
 })
 
+
 setTimeout(function(){
     console.log('hit');
-    backend.leaveKingdom(app, 'kingslanding');
-}, 10000);
+    console.log(backend.destroyKingdom(app, 'kingslanding'));
+}, 1000);
+setTimeout(function(){
+    console.log('hit');
+    console.log(backend.createKingdom(app, 'kingslanding'));
+}, 2000);
+setTimeout(function(){
+    console.log('hit');
+    console.log(backend.destroyKingdom(app, 'kingslanding'));
+}, 3000);
 
 
 // chuck the rest into the narrow sea of 404's

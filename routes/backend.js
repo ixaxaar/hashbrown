@@ -23,6 +23,13 @@ Array.prototype.remove = function(from, to) {
 };
 
 
+modules.export = function() {
+    RouteStack.push(new route);
+    return express();
+}
+
+
+
 exports.narrowSea = function(app, func) {
     try {
         narrowSea = func;
@@ -182,6 +189,7 @@ exports.leaveKingdom = function(app, kingdomName){
 
                 // remove this module's route
                 app.stack.forEach(function(stack){
+                    console.log(stack.route);
                     if (stack.route == ('/' + kingdom.name)){
                         app.stack.remove(i);
                         ret = true;
@@ -201,12 +209,12 @@ exports.leaveKingdom = function(app, kingdomName){
 }
 
 
-exports.createKingdom = function(app, rootDir, modules){
+exports.createKingdom = function(app, rootDir){
     var ret = false;
 
     try {
         var fs = require('fs');
-        rootDir = process.getcwd() + '/modules/' + rootDir;
+        rootDir = process.cwd() + '/modules/' + rootDir;
         var rootJson = rootDir + '/package.json';
 
         if (fs.existsSync(rootDir)) {
@@ -215,14 +223,16 @@ exports.createKingdom = function(app, rootDir, modules){
 
                 // check if the package already exists, if it does not, add the
                 // new json part to modules.json
-                if (!function () {
-                    modules.kingdoms.forEach(function(kingdom) {
-                        if (kingdom.name == newPackage.name) return true;
-                    })
-                    return false;
-                }) {
-                    modules.kingdoms[modules.kingdoms.length] = newPackage;
-                    this.syncExports(app, modules);
+                if (function () {
+                    var evl = false;
+                    realm.kingdoms.forEach(function(kingdom) {
+                        if (kingdom.name == newPackage.name) evl = true;
+                    });
+                    return evl;
+                }() == false) {
+                    realm.kingdoms.push(newPackage);
+                    console.log('pushed');
+                    this.syncExports(app, realm);
                     ret = true;
                 }
             }
@@ -238,8 +248,32 @@ exports.createKingdom = function(app, rootDir, modules){
 }
 
 
-exports.destroyKingdom = function(kingdom, modules){
-    //
+exports.destroyKingdom = function(app, kingdomName){
+    var ret = false;
+    var i = 0;
+
+    try {
+        // leave the kingdom and delete it
+        if (this.leaveKingdom(app, kingdomName))
+            realm.kingdoms.forEach(function (kingdom) {
+                if (kingdom.name == kingdomName) {
+                    realm.kingdoms.remove(i);
+                    exports.syncExports(app, realm);
+                    console.log('Removed');
+                    ret = true;
+                }
+                i++;
+            });
+
+        // todo: delete the folder as well?
+    } catch (err) {
+        console.log("Could not destroy kingdom");
+        if ('development' == app.get('env')) {
+            throw err;
+        }
+    }
+
+    return ret;
 }
 
 
@@ -251,7 +285,7 @@ exports.syncExports = function(app, jsonVariable, jsonFile){
         jsonVariable = realm;
     }
     try{
-        fs = require("fs");
+        var fs = require("fs");
         fs.writeFileSync(jsonFile, JSON.stringify(jsonVariable, null, 2));
     } catch (err) {
         console.log("Could not update modules.json");
@@ -287,22 +321,40 @@ exports.exposeAPI = function(apiName, apiModule, apiHandle){
         }
     } catch (err) {
         console.log("Could not expose API");
-        if ('development' == app.get('env')) {
-            throw err;
-        }
     }
 
     return ret;
 }
 
 exports.unexposeAPI = function(apiName, apiModule){
+    var ret = false;
+    var i = 0;
 
-}
+    try {
+        this.ExposedAPIs.forEach(function(api) {
+            if ((apiName == api.name) && (apiModule == api.module)) {
+                this.ExposedAPIs.remove(i);
+                ret = true;
+            }
+            i++;
+        })
+    } catch (err) {
+        console.log("Could not unexpose API");
+    }
 
-exports.queryAPI = function(apiName){
-//    return apiModule;
+    return ret;
 }
 
 exports.getAPI = function(apiName, apiModule){
-    //
+    var ret = false;
+
+    try {
+            this.ExposedAPIs.forEach(function(api) {
+                if ((apiName == api.name) && (apiModule == api.module)) ret = api.handle;
+            })
+    } catch (err) {
+        console.log("Could not get API handle");
+    }
+
+    return ret;
 }
