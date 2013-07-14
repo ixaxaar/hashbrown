@@ -23,13 +23,6 @@ Array.prototype.remove = function(from, to) {
 };
 
 
-modules.export = function() {
-    RouteStack.push(new route);
-    return express();
-}
-
-
-
 exports.narrowSea = function(app, func) {
     try {
         narrowSea = func;
