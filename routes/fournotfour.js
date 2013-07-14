@@ -1,8 +1,8 @@
 
 /*
- * GET users listing.
+ * 404 page
  */
 
-exports.list = function(req, res){
-  res.send("respond with a resource");
+module.exports = function(req, res){
+  res.send(404);
 };
