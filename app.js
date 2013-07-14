@@ -54,23 +54,13 @@ kingdoms.forEach(function(kingdom) {
     }
 })
 
-
-setTimeout(function(){
-    console.log('hit');
-    console.log(backend.destroyKingdom(app, 'kingslanding'));
-}, 1000);
-setTimeout(function(){
-    console.log('hit');
-    console.log(backend.createKingdom(app, 'kingslanding'));
-}, 2000);
-setTimeout(function(){
-    console.log('hit');
-    console.log(backend.destroyKingdom(app, 'kingslanding'));
-}, 3000);
-
-
 // chuck the rest into the narrow sea of 404's
 backend.narrowSea(app, fournotfour);
+
+testAPI  = function(string) {
+    console.log(string);
+}
+backend.exposeAPI('test', 'test', testAPI);
 
 http.createServer(app).listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));
