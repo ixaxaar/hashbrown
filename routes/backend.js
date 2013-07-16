@@ -5,7 +5,7 @@
  */
 
 // gloooobal :O
-var realm = require(process.cwd() + '/modules/modules.json');
+exports.realm = require(process.cwd() + '/modules/modules.json');
 
 // the 404 function
 var narrowSea = function(req, res) {

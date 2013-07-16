@@ -10,6 +10,7 @@
     "passport": "*",
     "underscore": "*",
     "bcrypt": "*",
+    "node-uuid": "*",
     "jade": "*"
   },
   "devDependencies": {

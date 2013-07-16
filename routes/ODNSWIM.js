@@ -6,14 +6,58 @@
 
 /* ONE DOES NOT SIMPLY WALK INTO MORDOR */
 
-var crypto = require("crypto")
+var crypto = require("crypto");
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
+var backend = require('backend');
+var _ = require('underscore');
 
 /** How ODNSWIM works:
  *  1. Login page generates aes hash of password, sends to server
  *  2. ODNSWIM generates a hash key of the hash and stores in DB
  */
+
+/**
+ * Permission levels and operations
+ * Actions <-> permissions have direct mapping
+ */
+
+exports.Permission = {
+    'root'  :   15,
+    'org'   :   5,
+    'admin' :   4,
+    'mgr'   :   3,
+    'modify':   2,
+    'access':   1,
+    'none'  :   0,
+    'hasPermission'         :   _hasPermission,
+    'calcMaxPermission'     :   _calcMaxPermission
+};
+
+_hasPermission = function(entity, kingdom, perm) {
+    for (var p in Permission) {
+        if (p == 0) return false;
+        if (entity.perm[kingdom.permEntry] >= perm) return true;
+    }
+}
+
+// a user's parent is his org
+// an org's parent is itself
+// every kingdom has to have a different permEntry!
+_calcMaxPermission = function(entity, kingdom) {
+    for (var p in Permission) {
+        if (Perm[p] == 0) return 0;
+        if ((entity.perm[kingdom.permEntry] & Perm[p]) &&
+            (entity.parent.perm >= entity.perm[kingdom.permEntry])) return Perm[p];
+    }
+}
+
+/* Generate the key of received hash
+ */
+function _generateKeyToMordor(hash) {
+    var salt = crypto.randomBytes(256);
+    return salt + crypto.createCipher("aes192", hash);
+}
 
 /**
  * User's password hash structure
@@ -28,24 +72,31 @@ function password(uuid, hash){
  * Prmission verification functions
  */
 
-_userPermission = function(granterPerm, resourcePerm) {
-
+_permission = function(granter, resource) {
+    return ((granter.perm & resource.perm_mask) >> resource.perm_shift);
 }
 
 /**
  * User's permissions structure
  */
 
-var userPermission = function userPermission(uuid){
+exports.UserPermission = function (uuid, hash){
     this.user              =   uuid;
     this.perm              =   0;
+    this.password          =   new password(this.uuid, hash);
 }
 
-userPermission.prototype = {};
-userPermission.prototype.permissionGranter = function(granter, kingdom) {
+UserPermission.prototype = {};
+
+// update the user's permission with respect to a module
+UserPermission.prototype.granter = function(granter, user, kingdom, permission) {
     var ret = false;
-    if (_userPermission(granter.permissions.perm, this.perm) == CADMIN) {
-        ret =  _addPerm(this.perm, kingdom);
+
+    // granter has admin rights for the module
+    if (Permission.hasPermission(granter, kingdom, Permission['admin'])) {
+        // granter is asking to give permission within his rights
+        if (permission <= granter.perm[kingdom.permEntry])
+            user.perm[kingdom.permEntry] = permission;
     }
     return ret;
 }
@@ -54,18 +105,21 @@ userPermission.prototype.permissionGranter = function(granter, kingdom) {
  * Kingdom's permissions structure
  */
 
-var kingdomPermission = function kingdomPermission(name){
-        this.kingdom           =   name,
-        this.perm              =   0
+exports.KingdomPermission = function (uuid){
+    this.kingdom           =   uuid;
+    this.perm              =   0;
+    this.permEntry         =   backend.realm.kingdoms.length();
 }
 
-kingdomPermission.prototype = {};
-kingdomPermission.prototype.permissionGranter = function(granter, user) {
+KingdomPermission.prototype = {};
+
+// update the module's permission with respect to a user
+KingdomPermission.prototype.granter = function(granter, user, kingdom, permission) {
     var ret = false;
-    if (_userPermission(granter.permissions.perm, this.perm) == CADMIN) {
-        ret =  _addPerm(this.perm, user);
+    // granter has admin rights for the module
+    if (Permission.hasPermission(granter, kingdom, Permission['admin'])) {
+
     }
-    return ret;
 }
 
 _grantPermission = function(granter, user, kingdom) {
@@ -77,7 +131,9 @@ _verifyPermission = function(user, resource) {
     var ret = false;
     //check if the user has permission to the resource's kingdom first
     if (resource.kingdom.hasAccess(user)) {
-        if ()
+        if () {
+
+        }
     }
 }
 
@@ -143,13 +199,7 @@ exports.createTheBlackGates = function() {
 //   login page.
 exports.openGatesOfMordor = function(req, res, next) {
     if (req.isAuthenticated()) { return next(); }
-    res.redirect('/login')
+    res.redirect('/login');
 }
 
-/* Generate the key of received hash
- */
-var _generateKeyToMordor = function(hash) {
-    var salt = crypto.randomBytes(256);
-    return key = salt + crypto.createCipher("aes192", hash);
-}
 
