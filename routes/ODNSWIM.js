@@ -112,6 +112,43 @@ exports.KingdomPermission = function (uuid){
 
 KingdomPermission.prototype = {};
 
+/**
+ * Permission evaluation functions
+ */
+
+// evaluate permissions for users
+exports.evalAccessPermission = function(reqUrl, user) {
+    var mod = backend.realm.getKingdoms(app);
+    var url = (reqUrl.split('/'))[0];
+
+    mod.forEach(function(m) {
+        if (m == url) {
+            mod = m;
+            break;
+        }
+    });
+
+    // for accessing modules, an ACCESS permission is sufficient
+    // however, for other creating content, a CREATE permission is reqd.
+    // that will obviously be handled while creating content by the content mgr.
+    return Permission.hasPermission(user, mod, Permission.access);
+};
+
+// only manager or admin can enter the control panel for e.g.
+exports.evalAdminPermission = function(reqUrl, user) {
+    var mod = backend.realm.getKingdoms(app);
+    var url = (reqUrl.split('/'))[0];
+
+    mod.forEach(function(m) {
+        if (m == url) {
+            mod = m;
+            break;
+        }
+    });
+
+    return (Permission.hasPermission(user, mod, Permission.mgr) ||
+        Permission.hasPermission(user, mod, Permission.admin));
+};
 
 /**
  * Construct the gates of MORDOR!
