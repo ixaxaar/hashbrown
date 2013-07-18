@@ -39,7 +39,7 @@ _hasPermission = function(entity, kingdom, perm) {
         if (p == 0) return false;
         if (entity.perm[kingdom.permEntry] >= perm) return true;
     }
-}
+};
 
 // a user's parent is his org
 // an org's parent is itself
@@ -50,7 +50,7 @@ _calcMaxPermission = function(entity, kingdom) {
         if ((entity.perm[kingdom.permEntry] & Perm[p]) &&
             (entity.parent.perm >= entity.perm[kingdom.permEntry])) return Perm[p];
     }
-}
+};
 
 /* Generate the key of received hash
  */
@@ -69,12 +69,12 @@ function password(uuid, hash){
 }
 
 /**
- * Prmission verification functions
+ * Permission verification functions
  */
 
 _permission = function(granter, resource) {
     return ((granter.perm & resource.perm_mask) >> resource.perm_shift);
-}
+};
 
 /**
  * User's permissions structure
@@ -84,12 +84,12 @@ exports.UserPermission = function (uuid, hash){
     this.user              =   uuid;
     this.perm              =   0;
     this.password          =   new password(this.uuid, hash);
-}
+};
 
 UserPermission.prototype = {};
 
 // update the user's permission with respect to a module
-UserPermission.prototype.granter = function(granter, user, kingdom, permission) {
+UserPermission.prototype.granter = function(granter, user, permission) {
     var ret = false;
 
     // granter has admin rights for the module
@@ -99,7 +99,7 @@ UserPermission.prototype.granter = function(granter, user, kingdom, permission) 
             user.perm[kingdom.permEntry] = permission;
     }
     return ret;
-}
+};
 
 /**
  * Kingdom's permissions structure
@@ -107,35 +107,11 @@ UserPermission.prototype.granter = function(granter, user, kingdom, permission) 
 
 exports.KingdomPermission = function (uuid){
     this.kingdom           =   uuid;
-    this.perm              =   0;
     this.permEntry         =   backend.realm.kingdoms.length();
-}
+};
 
 KingdomPermission.prototype = {};
 
-// update the module's permission with respect to a user
-KingdomPermission.prototype.granter = function(granter, user, kingdom, permission) {
-    var ret = false;
-    // granter has admin rights for the module
-    if (Permission.hasPermission(granter, kingdom, Permission['admin'])) {
-
-    }
-}
-
-_grantPermission = function(granter, user, kingdom) {
-    return (kingdom.grantPermission(granter, user)) ?
-        user.grantPermission(granter, kingdom) : false;
-}
-
-_verifyPermission = function(user, resource) {
-    var ret = false;
-    //check if the user has permission to the resource's kingdom first
-    if (resource.kingdom.hasAccess(user)) {
-        if () {
-
-        }
-    }
-}
 
 /**
  * Construct the gates of MORDOR!
