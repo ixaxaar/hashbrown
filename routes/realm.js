@@ -26,6 +26,8 @@ Array.prototype.remove = function(from, to) {
 exports.narrowSea = function(app, func) {
     try {
         narrowSea = func;
+        // install the 404 handler for all misc requests
+        app.all("*", narrowSea);
     } catch (err) {
         console.log("Could not register 404 function");
         if ('development' == app.get('env')) {
@@ -39,7 +41,7 @@ exports.narrowSea = function(app, func) {
 exports.getKingdoms = function(app) {
     try {
         var kingdoms = [];
-        realm.kingdoms.forEach(function(kingdom) {
+        this.realm.kingdoms.forEach(function(kingdom) {
             kingdoms.push(kingdom.name);
         })
         return kingdoms;
@@ -56,7 +58,7 @@ exports.getKingdoms = function(app) {
 exports.isEnabled = function(app, kingdomName) {
     var ret = false;
     try {
-        realm.kingdoms.forEach(function(kingdom) {
+        this.realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 if (kingdom.enabled == true) {
                     ret = true;
@@ -87,13 +89,13 @@ _removeNarrowSea = function (app) {
 exports.enableKingdom = function(app, kingdomName) {
     var ret = false;
     try {
-        realm.kingdoms.forEach(function(kingdom) {
+        this.realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 kingdom.enabled = true;
                 ret = true;
             }
         })
-        this.syncExports(app, realm);
+        this.syncExports(app, this.realm);
     } catch (err) {
         console.log("Error occured while enabling module");
         if ('development' == app.get('env')) {
@@ -108,14 +110,14 @@ exports.enableKingdom = function(app, kingdomName) {
 exports.disableKingdom = function(app, kingdomName){
     var ret = false;
     try {
-        realm.kingdoms.forEach(function(kingdom) {
+        this.realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 kingdom.enabled = false;
                 this.leaveKingdom(app, kingdomName);
                 ret = true;
             }
         })
-        this.syncExports(app, realm);
+        this.syncExports(app, this.realm);
     } catch (err) {
         console.log("Error occured while disabling module");
         if ('development' == app.get('env')) {
@@ -130,7 +132,7 @@ exports.disableKingdom = function(app, kingdomName){
 exports.initKingdom = function(app, kingdomName){
     var ret = false;
     try {
-        realm.kingdoms.forEach(function(kingdom) {
+        this.realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 var modInit = require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
                 modInit.init();
@@ -152,7 +154,7 @@ exports.enterKingdom = function(app, kingdomName){
     var ret = false;
 
     try {
-        realm.kingdoms.forEach(function(kingdom) {
+        this.realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 // add the routing middleware
                 app.use('/' + kingdom.name,
@@ -175,7 +177,7 @@ exports.leaveKingdom = function(app, kingdomName){
     var i = 0;
 
     try {
-        realm.kingdoms.forEach(function(kingdom) {
+        this.realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 // execute the module's custom uninit routine, allow it to exit cleanly
                 require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.uninit).uninit();
@@ -218,14 +220,14 @@ exports.createKingdom = function(app, rootDir){
                 // new json part to modules.json
                 if (function () {
                     var evl = false;
-                    realm.kingdoms.forEach(function(kingdom) {
+                    this.realm.kingdoms.forEach(function(kingdom) {
                         if (kingdom.name == newPackage.name) evl = true;
                     });
                     return evl;
                 }() == false) {
-                    realm.kingdoms.push(newPackage);
+                    this.realm.kingdoms.push(newPackage);
                     console.log('pushed');
-                    this.syncExports(app, realm);
+                    this.syncExports(app, this.realm);
                     ret = true;
                 }
             }
@@ -248,10 +250,10 @@ exports.destroyKingdom = function(app, kingdomName){
     try {
         // leave the kingdom and delete it
         if (this.leaveKingdom(app, kingdomName))
-            realm.kingdoms.forEach(function (kingdom) {
+            this.realm.kingdoms.forEach(function (kingdom) {
                 if (kingdom.name == kingdomName) {
-                    realm.kingdoms.remove(i);
-                    exports.syncExports(app, realm);
+                    this.realm.kingdoms.remove(i);
+                    exports.syncExports(app, this.realm);
                     console.log('Removed');
                     ret = true;
                 }
@@ -275,7 +277,7 @@ exports.syncExports = function(app, jsonVariable, jsonFile){
         jsonFile = process.cwd() + '/modules/modules.json';
     }
     if (!jsonVariable) {
-        jsonVariable = realm;
+        jsonVariable = this.realm;
     }
     try{
         var fs = require("fs");

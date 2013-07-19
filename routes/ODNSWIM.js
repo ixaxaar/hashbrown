@@ -7,10 +7,10 @@
 /* ONE DOES NOT SIMPLY WALK INTO MORDOR */
 
 var crypto = require("crypto");
-var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
-var backend = require('backend');
+var realm = require('./realm');
 var _ = require('underscore');
+var entity = require('./entity');
 
 /** How ODNSWIM works:
  *  1. Login page generates aes hash of password, sends to server
@@ -21,18 +21,6 @@ var _ = require('underscore');
  * Permission levels and operations
  * Actions <-> permissions have direct mapping
  */
-
-exports.Permission = {
-    'root'  :   15,
-    'org'   :   5,
-    'admin' :   4,
-    'mgr'   :   3,
-    'modify':   2,
-    'access':   1,
-    'none'  :   0,
-    'hasPermission'         :   _hasPermission,
-    'calcMaxPermission'     :   _calcMaxPermission
-};
 
 _hasPermission = function(entity, kingdom, perm) {
     for (var p in Permission) {
@@ -52,10 +40,25 @@ _calcMaxPermission = function(entity, kingdom) {
     }
 };
 
+exports.Permission = {
+    'root'  :   15,
+    'org'   :   5,
+    'admin' :   4,
+    'mgr'   :   3,
+    'modify':   2,
+    'access':   1,
+    'none'  :   0,
+    'hasPermission'         :   _hasPermission,
+    'calcMaxPermission'     :   _calcMaxPermission
+};
+
 /* Generate the key of received hash
  */
+
+//todo: this is not fit for shared multiple instances, fetch from DB
+var salt = crypto.randomBytes(256);
+
 function _generateKeyToMordor(hash) {
-    var salt = crypto.randomBytes(256);
     return salt + crypto.createCipher("aes192", hash);
 }
 
@@ -65,7 +68,7 @@ function _generateKeyToMordor(hash) {
 
 function password(uuid, hash){
     this.user      =   uuid;
-    this.key       =   _generateKeyToMordor(hash);
+    this.hash      =   _generateKeyToMordor(hash);
 }
 
 /**
@@ -83,13 +86,13 @@ _permission = function(granter, resource) {
 exports.UserPermission = function (uuid, hash){
     this.user              =   uuid;
     this.perm              =   0;
-    this.password          =   new password(this.uuid, hash);
+    this.password          =   new password(uuid, hash);
 };
 
-UserPermission.prototype = {};
+this.UserPermission.prototype = {};
 
 // update the user's permission with respect to a module
-UserPermission.prototype.granter = function(granter, user, permission) {
+this.UserPermission.prototype.granter = function(granter, user, permission) {
     var ret = false;
 
     // granter has admin rights for the module
@@ -107,72 +110,58 @@ UserPermission.prototype.granter = function(granter, user, permission) {
 
 exports.KingdomPermission = function (uuid){
     this.kingdom           =   uuid;
-    this.permEntry         =   backend.realm.kingdoms.length();
+    this.permEntry         =   realm.realm.kingdoms.length();
 };
 
-KingdomPermission.prototype = {};
+this.KingdomPermission.prototype = {};
 
 /**
- * Permission evaluation functions
+ * Permission evaluation function
  */
 
 // evaluate permissions for users
-exports.evalAccessPermission = function(reqUrl, user) {
-    var mod = backend.realm.getKingdoms(app);
+exports.evalPermission = function(reqUrl, user, perm) {
+    var mod = realm.realm.getKingdoms(app);
     var url = (reqUrl.split('/'))[0];
 
     mod.forEach(function(m) {
         if (m == url) {
             mod = m;
-            break;
         }
     });
 
     // for accessing modules, an ACCESS permission is sufficient
     // however, for other creating content, a CREATE permission is reqd.
     // that will obviously be handled while creating content by the content mgr.
-    return Permission.hasPermission(user, mod, Permission.access);
-};
-
-// only manager or admin can enter the control panel for e.g.
-exports.evalAdminPermission = function(reqUrl, user) {
-    var mod = backend.realm.getKingdoms(app);
-    var url = (reqUrl.split('/'))[0];
-
-    mod.forEach(function(m) {
-        if (m == url) {
-            mod = m;
-            break;
-        }
-    });
-
-    return (Permission.hasPermission(user, mod, Permission.mgr) ||
-        Permission.hasPermission(user, mod, Permission.admin));
+    // only manager or admin can enter the control panel for e.g.
+    return Permission.hasPermission(user, mod, perm);
 };
 
 /**
  * Construct the gates of MORDOR!
  */
-module.exports = InstallBlackGate;
+exports.BlackGate = BlackGate;
 
-function InstallBlackGate(app){
+function BlackGate(app, passport){
     app.use(passport.initialize());
     app.use(passport.session());
 }
 
-exports.createTheBlackGates = function() {
+exports.createTheBlackGates = function(passport) {
     // Passport session setup.
     //   To support persistent login sessions, Passport needs to be able to
     //   serialize users into and deserialize users out of the session.  Typically,
     //   this will be as simple as storing the user ID when serializing, and finding
     //   the user by ID when deserializing.
     passport.serializeUser(function(user, done) {
-        done(null, user.id);
+//        entity.add(user, function(u){
+            done(null, user.uuid);
+//        });
     });
 
     passport.deserializeUser(function(id, done) {
-        _findUserById(id, function (err, user) {
-            done(err, user);
+        entity.findByUuid(id, function(err, u) {
+            done(err, u);
         });
     });
 
@@ -185,16 +174,18 @@ exports.createTheBlackGates = function() {
         function(username, password, done) {
             // asynchronous verification, for effect...
             process.nextTick(function () {
-
                 // Find the user by username.  If there is no user with the given
                 // username, or the password is not correct, set the user to `false` to
                 // indicate failure and set a flash message.  Otherwise, return the
                 // authenticated `user`.
-                findByUsername(username, function(err, user) {
+                entity.findByUsername(username, function(err, user) {
+                    // failure cases
                     if (err) { return done(err); }
                     if (!user) { return done(null, false,
                         {message: 'Unknown user ' + username }); }
-                    if (user.password != _generateKeyToMordor(password)) {
+
+                    // match password
+                    if (user.perm.password.hash != _generateKeyToMordor(password)) {
                         return done(null, false, {message: 'Invalid password'});
                     }
                     return done(null, user);
@@ -202,7 +193,7 @@ exports.createTheBlackGates = function() {
             });
         }
     ));
-}
+};
 
 
 // Simple route middleware to ensure user is authenticated.
@@ -210,7 +201,7 @@ exports.createTheBlackGates = function() {
 //   the request is authenticated (typically via a persistent login session),
 //   the request will proceed.  Otherwise, the user will be redirected to the
 //   login page.
-exports.openGatesOfMordor = function(req, res, next) {
+exports.openBlackGate = function(req, res, next) {
     if (req.isAuthenticated()) { return next(); }
     res.redirect('/login');
 }
