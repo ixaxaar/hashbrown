@@ -5,12 +5,12 @@
  */
 
 // gloooobal :O
-exports.realm = require(process.cwd() + '/modules/modules.json');
+var realm = require(process.cwd() + '/modules/modules.json');
 
 // the 404 function
 var narrowSea = function(req, res) {
     res.send(404);
-}
+};
 
 // 404 default route number
 var narrowSeaRoute = 0;
@@ -41,7 +41,7 @@ exports.narrowSea = function(app, func) {
 exports.getKingdoms = function(app) {
     try {
         var kingdoms = [];
-        this.realm.kingdoms.forEach(function(kingdom) {
+        realm.kingdoms.forEach(function(kingdom) {
             kingdoms.push(kingdom.name);
         })
         return kingdoms;
@@ -58,7 +58,7 @@ exports.getKingdoms = function(app) {
 exports.isEnabled = function(app, kingdomName) {
     var ret = false;
     try {
-        this.realm.kingdoms.forEach(function(kingdom) {
+        realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 if (kingdom.enabled == true) {
                     ret = true;
@@ -75,27 +75,16 @@ exports.isEnabled = function(app, kingdomName) {
     return ret;
 }
 
-_removeNarrowSea = function (app) {
-    var i = 0;
-
-    app.stack.forEach(function(stack) {
-        if (stack.handle == narrowSea) {
-            app.stack.remove(i);
-        }
-        i++;
-    })
-}
-
 exports.enableKingdom = function(app, kingdomName) {
     var ret = false;
     try {
-        this.realm.kingdoms.forEach(function(kingdom) {
+        realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 kingdom.enabled = true;
                 ret = true;
             }
-        })
-        this.syncExports(app, this.realm);
+        });
+        this.syncExports(app, realm);
     } catch (err) {
         console.log("Error occured while enabling module");
         if ('development' == app.get('env')) {
@@ -110,14 +99,14 @@ exports.enableKingdom = function(app, kingdomName) {
 exports.disableKingdom = function(app, kingdomName){
     var ret = false;
     try {
-        this.realm.kingdoms.forEach(function(kingdom) {
+        realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 kingdom.enabled = false;
                 this.leaveKingdom(app, kingdomName);
                 ret = true;
             }
-        })
-        this.syncExports(app, this.realm);
+        });
+        this.syncExports(app, realm);
     } catch (err) {
         console.log("Error occured while disabling module");
         if ('development' == app.get('env')) {
@@ -132,13 +121,14 @@ exports.disableKingdom = function(app, kingdomName){
 exports.initKingdom = function(app, kingdomName){
     var ret = false;
     try {
-        this.realm.kingdoms.forEach(function(kingdom) {
+        realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
-                var modInit = require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
+                var modInit = require(process.cwd() +
+                    '/modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
                 modInit.init();
                 ret = true;
             }
-        })
+        });
     } catch (err) {
         console.log("Error occured in initializing module");
         if ('development' == app.get('env')) {
@@ -154,14 +144,15 @@ exports.enterKingdom = function(app, kingdomName){
     var ret = false;
 
     try {
-        this.realm.kingdoms.forEach(function(kingdom) {
+        realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 // add the routing middleware
                 app.use('/' + kingdom.name,
-                    require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
+                    require(process.cwd() +
+                        '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
                 ret = true;
             }
-        })
+        });
     } catch (err) {
         console.log("Error occured in loading entry");
         if ('development' == app.get('env')) {
@@ -177,22 +168,22 @@ exports.leaveKingdom = function(app, kingdomName){
     var i = 0;
 
     try {
-        this.realm.kingdoms.forEach(function(kingdom) {
+        realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 // execute the module's custom uninit routine, allow it to exit cleanly
-                require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.uninit).uninit();
+                require(process.cwd() +
+                    '/modules/' + kingdom.dirName + '/' + kingdom.scripts.uninit).uninit();
 
                 // remove this module's route
                 app.stack.forEach(function(stack){
-                    console.log(stack.route);
                     if (stack.route == ('/' + kingdom.name)){
                         app.stack.remove(i);
                         ret = true;
                     }
                     i++;
-                })
+                });
             }
-        })
+        });
     } catch (err) {
         console.log("Error occured in un-initializing module's routes");
         if ('development' == app.get('env')) {
@@ -220,14 +211,16 @@ exports.createKingdom = function(app, rootDir){
                 // new json part to modules.json
                 if (function () {
                     var evl = false;
-                    this.realm.kingdoms.forEach(function(kingdom) {
-                        if (kingdom.name == newPackage.name) evl = true;
-                    });
+                    if (realm.kingdoms) {
+                        realm.kingdoms.forEach(function(kingdom) {
+                            if (kingdom.name == newPackage.name) evl = true;
+                        });
+                    }
                     return evl;
                 }() == false) {
-                    this.realm.kingdoms.push(newPackage);
+                    realm.kingdoms.push(newPackage);
                     console.log('pushed');
-                    this.syncExports(app, this.realm);
+                    this.syncExports(app, realm);
                     ret = true;
                 }
             }
@@ -250,10 +243,10 @@ exports.destroyKingdom = function(app, kingdomName){
     try {
         // leave the kingdom and delete it
         if (this.leaveKingdom(app, kingdomName))
-            this.realm.kingdoms.forEach(function (kingdom) {
+            realm.kingdoms.forEach(function (kingdom) {
                 if (kingdom.name == kingdomName) {
-                    this.realm.kingdoms.remove(i);
-                    exports.syncExports(app, this.realm);
+                    realm.kingdoms.remove(i);
+                    exports.syncExports(app, realm);
                     console.log('Removed');
                     ret = true;
                 }
@@ -277,7 +270,7 @@ exports.syncExports = function(app, jsonVariable, jsonFile){
         jsonFile = process.cwd() + '/modules/modules.json';
     }
     if (!jsonVariable) {
-        jsonVariable = this.realm;
+        jsonVariable = realm;
     }
     try{
         var fs = require("fs");
@@ -302,7 +295,8 @@ exports.exposeAPI = function(apiName, apiModule, apiHandle){
         //check if api name is taken
         if (function() {
             this.ExposedAPIs.forEach(function(api) {
-                if ((api.name == apiName) && (api.module == apiModule)) return false;
+                if ((api.name == apiName) && (api.module == apiModule))
+                    return false;
             });
             return true;
         }) {
@@ -341,11 +335,12 @@ exports.unexposeAPI = function(apiName, apiModule){
 }
 
 exports.getAPI = function(apiName, apiModule){
-    var ret = false;
+    var ret = null;
 
     try {
             this.ExposedAPIs.forEach(function(api) {
-                if ((apiName == api.name) && (apiModule == api.module)) ret = api.handle;
+                if ((apiName == api.name) && (apiModule == api.module))
+                    ret = api.handle;
             })
     } catch (err) {
         console.log("Could not get API handle");

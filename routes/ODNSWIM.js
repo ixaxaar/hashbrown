@@ -22,23 +22,24 @@ var entity = require('./entity');
  * Actions <-> permissions have direct mapping
  */
 
-_hasPermission = function(entity, kingdom, perm) {
-    return (entity.perm[kingdom.permEntry] >= perm);
+var _hasPermission = function(entity, kingdom, perm) {
+    return (entity.perm.perm[kingdom.perm.permEntry] >= perm);
 };
 
 // a user's parent is his org
 // an org's parent is itself
 // every kingdom has to have a different permEntry!
-_calcMaxPermission = function(entity, kingdom) {
+var _calcMaxPermission = function(entity, kingdom) {
     for (var p in Permission) {
         if (Perm[p] == 0) return 0;
-        if ((entity.perm[kingdom.permEntry] & Perm[p]) &&
-            (entity.parent.perm >= entity.perm[kingdom.permEntry])) return Perm[p];
+        if ((entity.perm[kingdom.perm.permEntry] & Perm[p]) &&
+            (entity.parent.perm >= entity.perm[kingdom.perm.permEntry]))
+            return Perm[p];
     }
 };
 
 exports.Permission = {
-    'root'  :   15,
+    'god'   :   15,
     'org'   :   5,
     'admin' :   4,
     'mgr'   :   3,
@@ -89,14 +90,15 @@ exports.UserPermission = function (uuid, hash){
 this.UserPermission.prototype = {};
 
 // update the user's permission with respect to a module
-this.UserPermission.prototype.granter = function(granter, user, kingdom, permission) {
+this.UserPermission.prototype.granter =
+    function(granter, user, kingdom, permission) {
     var ret = false;
 
     // granter has admin rights for the module
     if (Permission.hasPermission(granter, kingdom, Permission['admin'])) {
         // granter is asking to give permission within his rights
-        if (permission <= granter.perm[kingdom.permEntry])
-            user.perm[kingdom.permEntry] = permission;
+        if (permission <= granter.perm[kingdom.perm.permEntry])
+            user.perm.perm[kingdom.perm.permEntry] = permission;
     }
     return ret;
 };
@@ -105,9 +107,9 @@ this.UserPermission.prototype.granter = function(granter, user, kingdom, permiss
  * Kingdom's permissions structure
  */
 
-exports.KingdomPermission = function (uuid){
+exports.KingdomPermission = function (uuid, shift){
     this.kingdom           =   uuid;
-    this.permEntry         =   realm.realm.kingdoms.length();
+    this.permEntry         =   shift;
 };
 
 this.KingdomPermission.prototype = {};
@@ -182,7 +184,8 @@ exports.createTheBlackGates = function(passport) {
                         {message: 'Unknown user ' + username }); }
 
                     // match password
-                    if (user.perm.password.hash != _generateKeyToMordor(password)) {
+                    if (user.perm.password.hash !=
+                        _generateKeyToMordor(password)) {
                         return done(null, false, {message: 'Invalid password'});
                     }
                     else return done(null, user);

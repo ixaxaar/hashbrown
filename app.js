@@ -3,6 +3,9 @@
  * Module dependencies.
  */
 
+/** some modules have circular dependencies, hence, initialize ALL of them
+ */
+
 var express = require('express')
     , realm = require('./routes/realm')
     , fournotfour =  require('./routes/fournotfour')
@@ -42,6 +45,8 @@ app.configure('development', function(){
 if ('development' == app.get('env')) {
   app.use(express.errorHandler());
 }
+
+entity.init();
 
 // load modules.json
 var kingdoms = realm.getKingdoms(app);
@@ -84,13 +89,16 @@ app.get('/', mordor.openBlackGate, home.home);
 
 // initialize all APIs here
 
+realm.createKingdom(app, 'kingslanding');
+realm.createKingdom(app, 'winterfell');
+
 // initialize and load routing rules for all modules
 kingdoms.forEach(function(kingdom) {
     if (realm.isEnabled(app, kingdom)) {
         realm.initKingdom(app, kingdom);
         realm.enterKingdom(app, kingdom);
     }
-})
+});
 
 // chuck the rest into the narrow sea of 404's
 realm.narrowSea(app, fournotfour);
@@ -101,7 +109,12 @@ testAPI  = function(string) {
 }
 realm.exposeAPI('test', 'test', testAPI);
 
-heartbeat.turnMeOn();
+var cleanup = function() {
+    realm.destroyKingdom(app, 'kingslanding');
+    realm.destroyKingdom(app, 'winterfell');
+};
+
+heartbeat.turnMeOn(cleanup);
 
 http.createServer(app).listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));

@@ -64,12 +64,13 @@ exports.notifyDevelopers = function(subj, errMsg, emails, fn) {
 
 /** Signal handling - in case of serious errors, mail the devs! */
 
-exports.turnMeOn = function() {
+exports.turnMeOn = function(cleanup) {
     process.on( 'SIGINT', function() {
         console.log("gracefully shutting down from  SIGINT" );
         exports.notifyDevelopers("Error", "Received SIGINT, quitting", devEmails,
             function(){
                 // some other closing procedures go here
+                if (cleanup) cleanup();
                 process.exit();
         });
     });
@@ -79,6 +80,7 @@ exports.turnMeOn = function() {
         exports.notifyDevelopers("Error", "Received SIGHUP, quitting", devEmails,
             function(){
                 // some other closing procedures go here
+                if (cleanup) clanup();
                 process.exit();
         });
     });
@@ -87,5 +89,5 @@ exports.turnMeOn = function() {
     setInterval(function() {
         exports.notifyDevelopers("Info", "Heartbeat", devEmails, function(){
         });
-    }, 1000000);
+    }, 500000);
 };
