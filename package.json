@@ -7,6 +7,13 @@
   },
   "dependencies": {
     "express": "3.3.3",
+    "passport": "*",
+    "passport-local": "*",
+    "connect-flash": "*",
+    "underscore": "*",
+    "bcrypt": "*",
+    "nodemailer": "*",
+    "node-uuid": "*",
     "jade": "*"
   },
   "devDependencies": {

@@ -10,7 +10,7 @@ var realm = require(process.cwd() + '/modules/modules.json');
 // the 404 function
 var narrowSea = function(req, res) {
     res.send(404);
-}
+};
 
 // 404 default route number
 var narrowSeaRoute = 0;
@@ -26,6 +26,8 @@ Array.prototype.remove = function(from, to) {
 exports.narrowSea = function(app, func) {
     try {
         narrowSea = func;
+        // install the 404 handler for all misc requests
+        app.all("*", narrowSea);
     } catch (err) {
         console.log("Could not register 404 function");
         if ('development' == app.get('env')) {
@@ -73,17 +75,6 @@ exports.isEnabled = function(app, kingdomName) {
     return ret;
 }
 
-_removeNarrowSea = function (app) {
-    var i = 0;
-
-    app.stack.forEach(function(stack) {
-        if (stack.handle == narrowSea) {
-            app.stack.remove(i);
-        }
-        i++;
-    })
-}
-
 exports.enableKingdom = function(app, kingdomName) {
     var ret = false;
     try {
@@ -92,7 +83,7 @@ exports.enableKingdom = function(app, kingdomName) {
                 kingdom.enabled = true;
                 ret = true;
             }
-        })
+        });
         this.syncExports(app, realm);
     } catch (err) {
         console.log("Error occured while enabling module");
@@ -114,7 +105,7 @@ exports.disableKingdom = function(app, kingdomName){
                 this.leaveKingdom(app, kingdomName);
                 ret = true;
             }
-        })
+        });
         this.syncExports(app, realm);
     } catch (err) {
         console.log("Error occured while disabling module");
@@ -132,11 +123,12 @@ exports.initKingdom = function(app, kingdomName){
     try {
         realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
-                var modInit = require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
+                var modInit = require(process.cwd() +
+                    '/modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
                 modInit.init();
                 ret = true;
             }
-        })
+        });
     } catch (err) {
         console.log("Error occured in initializing module");
         if ('development' == app.get('env')) {
@@ -156,10 +148,11 @@ exports.enterKingdom = function(app, kingdomName){
             if (kingdom.name == kingdomName) {
                 // add the routing middleware
                 app.use('/' + kingdom.name,
-                    require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
+                    require(process.cwd() +
+                        '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
                 ret = true;
             }
-        })
+        });
     } catch (err) {
         console.log("Error occured in loading entry");
         if ('development' == app.get('env')) {
@@ -178,19 +171,19 @@ exports.leaveKingdom = function(app, kingdomName){
         realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 // execute the module's custom uninit routine, allow it to exit cleanly
-                require(process.cwd() + '/modules/' + kingdom.dirName + '/' + kingdom.scripts.uninit).uninit();
+                require(process.cwd() +
+                    '/modules/' + kingdom.dirName + '/' + kingdom.scripts.uninit).uninit();
 
                 // remove this module's route
                 app.stack.forEach(function(stack){
-                    console.log(stack.route);
                     if (stack.route == ('/' + kingdom.name)){
                         app.stack.remove(i);
                         ret = true;
                     }
                     i++;
-                })
+                });
             }
-        })
+        });
     } catch (err) {
         console.log("Error occured in un-initializing module's routes");
         if ('development' == app.get('env')) {
@@ -218,9 +211,11 @@ exports.createKingdom = function(app, rootDir){
                 // new json part to modules.json
                 if (function () {
                     var evl = false;
-                    realm.kingdoms.forEach(function(kingdom) {
-                        if (kingdom.name == newPackage.name) evl = true;
-                    });
+                    if (realm.kingdoms) {
+                        realm.kingdoms.forEach(function(kingdom) {
+                            if (kingdom.name == newPackage.name) evl = true;
+                        });
+                    }
                     return evl;
                 }() == false) {
                     realm.kingdoms.push(newPackage);
@@ -300,7 +295,8 @@ exports.exposeAPI = function(apiName, apiModule, apiHandle){
         //check if api name is taken
         if (function() {
             this.ExposedAPIs.forEach(function(api) {
-                if ((api.name == apiName) && (api.module == apiModule)) return false;
+                if ((api.name == apiName) && (api.module == apiModule))
+                    return false;
             });
             return true;
         }) {
@@ -339,11 +335,12 @@ exports.unexposeAPI = function(apiName, apiModule){
 }
 
 exports.getAPI = function(apiName, apiModule){
-    var ret = false;
+    var ret = null;
 
     try {
             this.ExposedAPIs.forEach(function(api) {
-                if ((apiName == api.name) && (apiModule == api.module)) ret = api.handle;
+                if ((apiName == api.name) && (apiModule == api.module))
+                    ret = api.handle;
             })
     } catch (err) {
         console.log("Could not get API handle");

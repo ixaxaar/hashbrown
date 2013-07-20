@@ -3,14 +3,24 @@
  * Module dependencies.
  */
 
+/** some modules have circular dependencies, hence, initialize ALL of them
+ */
+
 var express = require('express')
-  , backend = require('./routes/backend')
-  , fournotfour =  require('./routes/fournotfour')
-  , home = require('./routes/home')
-  , http = require('http')
-  , path = require('path');
+    , realm = require('./routes/realm')
+    , fournotfour =  require('./routes/fournotfour')
+    , home = require('./routes/home')
+    , login = require('./routes/login')
+    , http = require('http')
+    , path = require('path')
+    , entity = require('./routes/entity')
+    , passport = require('passport')
+    , heartbeat = require('./routes/heartbeat')
+    , mordor = require("./routes/ODNSWIM");
 
 var app = express();
+
+mordor.createTheBlackGates(passport);
 
 // development environment
 app.configure('development', function(){
@@ -21,8 +31,9 @@ app.configure('development', function(){
     app.use(express.logger('dev'));
     app.use(express.bodyParser());
     app.use(express.methodOverride());
-    app.use(express.cookieParser('your secret here'));
+    app.use(express.cookieParser('eylhjfgewhbfiwegqwgiqwhkbhkvgu'));
     app.use(express.session());
+    mordor.BlackGate(app, passport);
     app.use(app.router);
     app.use(express.static(path.join(__dirname, 'public')));
 })
@@ -35,33 +46,77 @@ if ('development' == app.get('env')) {
   app.use(express.errorHandler());
 }
 
+entity.init();
+
 // load modules.json
-var kingdoms = backend.getKingdoms(app);
+var kingdoms = realm.getKingdoms(app);
 if (!kingdoms) {
     err = "FATAL: Could not load modules";
     throw err;
 }
 
 /** Routing: default routing except home goes to 404 */
-// unless otherwise handled by some module from modules.json
-app.get('/', home.home);
+
+app.get('/login', login.login);
+
+app.post('/login', function(req, res, next) {
+//    req.accepts('application/json');
+    passport.authenticate('local', function(err, user, info) {
+        if (err) { return next(err) }
+        if (!user) {
+            console.log('error', info.message);
+            return res.redirect('/login');
+        }
+        req.logIn(user, function(err) {
+            if (err) { return next(err); }
+            return res.redirect('/');
+        });
+    })(req, res, next);
+});
+
+app.get('/logout', function(req, res){
+    req.logout();
+    res.redirect('/login');
+});
+
+// authenticate EVERYTHING except the login page,
+// redirect to login page if auth fails
+// it is _VERY_ important that next() is called,
+// otherwise no other route will work
+app.all("*", mordor.openBlackGate);
+
+app.get('/', mordor.openBlackGate, home.home);
+
+// initialize all APIs here
+
+realm.createKingdom(app, 'kingslanding');
+realm.createKingdom(app, 'winterfell');
 
 // initialize and load routing rules for all modules
 kingdoms.forEach(function(kingdom) {
-    if (backend.isEnabled(app, kingdom)) {
-        backend.initKingdom(app, kingdom);
-        backend.enterKingdom(app, kingdom);
+    if (realm.isEnabled(app, kingdom)) {
+        realm.initKingdom(app, kingdom);
+        realm.enterKingdom(app, kingdom);
     }
-})
+});
 
 // chuck the rest into the narrow sea of 404's
-backend.narrowSea(app, fournotfour);
+realm.narrowSea(app, fournotfour);
 
+// test API
 testAPI  = function(string) {
     console.log(string);
 }
-backend.exposeAPI('test', 'test', testAPI);
+realm.exposeAPI('test', 'test', testAPI);
+
+var cleanup = function() {
+    realm.destroyKingdom(app, 'kingslanding');
+    realm.destroyKingdom(app, 'winterfell');
+};
+
+heartbeat.turnMeOn(cleanup);
 
 http.createServer(app).listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));
 });
+
