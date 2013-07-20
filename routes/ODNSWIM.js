@@ -23,10 +23,7 @@ var entity = require('./entity');
  */
 
 _hasPermission = function(entity, kingdom, perm) {
-    for (var p in Permission) {
-        if (p == 0) return false;
-        if (entity.perm[kingdom.permEntry] >= perm) return true;
-    }
+    return (entity.perm[kingdom.permEntry] >= perm);
 };
 
 // a user's parent is his org
@@ -59,7 +56,7 @@ exports.Permission = {
 var salt = crypto.randomBytes(256);
 
 function _generateKeyToMordor(hash) {
-    return salt + crypto.createCipher("aes192", hash);
+    return salt + crypto.createHash("md5").update(hash).digest("hex");
 }
 
 /**
@@ -92,7 +89,7 @@ exports.UserPermission = function (uuid, hash){
 this.UserPermission.prototype = {};
 
 // update the user's permission with respect to a module
-this.UserPermission.prototype.granter = function(granter, user, permission) {
+this.UserPermission.prototype.granter = function(granter, user, kingdom, permission) {
     var ret = false;
 
     // granter has admin rights for the module
@@ -188,7 +185,7 @@ exports.createTheBlackGates = function(passport) {
                     if (user.perm.password.hash != _generateKeyToMordor(password)) {
                         return done(null, false, {message: 'Invalid password'});
                     }
-                    return done(null, user);
+                    else return done(null, user);
                 })
             });
         }

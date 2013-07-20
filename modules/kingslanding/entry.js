@@ -4,7 +4,7 @@
  * Time: 9:16 PM
  */
 
-backend = require(process.cwd() + '/routes/backend');
+backend = require(process.cwd() + '/routes/realm');
 
 //Configure this module's routes:
 //each app.get can define handlers for GET requests handled

@@ -12,6 +12,7 @@
     "connect-flash": "*",
     "underscore": "*",
     "bcrypt": "*",
+    "nodemailer": "*",
     "node-uuid": "*",
     "jade": "*"
   },

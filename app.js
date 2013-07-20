@@ -12,6 +12,7 @@ var express = require('express')
     , path = require('path')
     , entity = require('./routes/entity')
     , passport = require('passport')
+    , heartbeat = require('./routes/heartbeat')
     , mordor = require("./routes/ODNSWIM");
 
 var app = express();
@@ -68,8 +69,8 @@ app.post('/login', function(req, res, next) {
     })(req, res, next);
 });
 
-app.post('/logout', function(req, res, next) {
-//passport.dele
+app.get('/logout', function(req, res){
+    req.logout();
     res.redirect('/login');
 });
 
@@ -99,6 +100,8 @@ testAPI  = function(string) {
     console.log(string);
 }
 realm.exposeAPI('test', 'test', testAPI);
+
+heartbeat.turnMeOn();
 
 http.createServer(app).listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));
