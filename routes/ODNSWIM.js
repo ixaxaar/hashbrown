@@ -206,4 +206,9 @@ exports.openBlackGate = function(req, res, next) {
     res.redirect('/login');
 }
 
+// check if a user's organization has access to this kingdom
+// an organization's permissions can only be altered by god :O
+var checkOrgPermission = function(user, kingdom) {
+
+}
 
