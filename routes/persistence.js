@@ -7,7 +7,7 @@
  */
 
 var mongoose = require('mongoose');
-
+mongoose.connect('mongodb://localhost/persistence');
 
 
 exports.fetchUsers = function(UserUUIDs) {
@@ -34,3 +34,6 @@ exports.commitUserData = function(userData) {
 
 }
 
+exports.exists = function(uname) {
+
+}
