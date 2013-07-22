@@ -108,14 +108,6 @@ this.User.prototype.grant = function(granter, user, kingdom, perm) {
     console.log("not granted");
 };
 
-// associate user with different parent
-//this.User.prototype.reassoc
-//
-//// update a user's profile data
-//this.User.prototype.updateProfile
-//
-//// update a user's password
-//this.User.prototype.passwd
 
 /**
  * The User Management helpers
@@ -199,7 +191,7 @@ var KingdomSchema = new Schema({
 mongoose.model("KingdomSchema", KingdomSchema);
 
 
-/** Schema methods */
+/** User Schema methods */
 
 var GOD = null;
 
@@ -237,11 +229,8 @@ UserSchema.method.add = function(granter, uid, hash, fn) {
             else fn(true, null);
         });
     } else { fn(true, null); }
-
-    fn(true, null);
 };
 
-// todo: move this shit to odnswim!
 // delete a user
 UserSchema.method.delete = function(granter, user, fn) {
     // see if granter is higher up than the user
@@ -253,47 +242,58 @@ UserSchema.method.delete = function(granter, user, fn) {
             });
         } else fn(true, null);
     });
-
-    fn(true, u);
 };
-
-//UserSchema.method.delete = function(granter, user, fn) {
-//    // see if the granter is higher up in the ladder than the user
-//    if (user && (granter.perm.admin >= user.perm.admin)) {
-//        // find and delete
-//        UserSchema.find({uid: user.uuid}).remove(function(err, u) {
-//            if (!err) fn(null, u);
-//            else fn(true, null);
-//        });
-//    }
-//
-//    fn(true, u);
-//};
 
 // grant permissions to a user
 UserSchema.method.grant = function(granter, user, kingdom, perm, fn) {
     // see if granter is higher up than the user
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
-        user.perm.grant(granter, user, kingdom, perm, function(err, u) {
-            if (!err) fn(null, u);
-            else fn(true, null);
-        });
+        if (!err) {
+            user.perm.grant(granter, user, kingdom, perm, function(err, u) {
+                if (!err) fn(null, u);
+                else fn(true, null);
+            });
+        } else fn(true, null);
     });
-
-    fn(true, null);
 };
 
-//UserSchema.method.grant = function(granter, user, kingdom, perm, fn) {
-//    // see if granter is higher up than the user
-//    if (user && (granter.perm.admin >= user.perm.admin)) {
-//        // see if granter has permission to grant permission w.r.t. a kingdom
-//        if (mordor.Permission.hasPermission(granter, kingdom, mordor.Permission.mgr)) {
-//            user.perm.grant(granter, user, kingdom, perm, function(err, u) {
-//                if (!err) fn(null, u);
-//                else fn(true, null);
-//            });
-//        }
-//    }
-//
-//    fn(true, null);
-//};
+// reassociate a user to a different parent
+UserSchema.method.reassoc = function(granter, newParent, user, fn) {
+    // see if granter has permission to change user's parent
+    mordor.permission.hasGreaterPermission(granter, user.parent, function(err) {
+        if (!err) {
+            mordor.permission.hasGreaterPermission(granter, newParent, function(err) {
+                if (!err) {
+                    user.parent = newParent;
+                    fn(null, user);
+                } else fn(true, null);
+            });
+        } else fn(true, null);
+    });
+};
+
+// update a user's profile data
+UserSchema.method.updateProfile = function(granter, user, data, fn) {
+    // todo
+};
+
+UserSchema.method.passwd = function(granter, user, passwd, fn) {
+    // now this is a tricky one! - todo: does the user's manager has control?
+    mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+        if (!err) {
+            user.perm.changePasswd(grnter, passwd);
+            fn(null, user);
+        } else fn(true, null);
+    });
+};
+
+// update a user's admin status
+UserSchema.method.admin = function(granter, user, perm, fn) {
+    mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+        if (!err) {
+            user.perm.updateAdmin(granter, perm);
+            fn(false, user);
+        } else fn(true, null);
+    });
+};
+
