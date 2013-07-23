@@ -52,13 +52,13 @@ var _hasGreaterPermission = function(granter, user, fn) {
 };
 
 exports.Permission = {
-    'god'   :   15,
-    'org'   :   5,
-    'admin' :   4,
-    'mgr'   :   3,
-    'modify':   2,
-    'access':   1,
-    'none'  :   0,
+    'god'   :   1 << 15,
+    'org'   :   1 << 5,
+    'admin' :   1 << 4,
+    'mgr'   :   1 << 3,
+    'modify':   1 << 2,
+    'access':   1 << 1,
+    'none'  :   1 << 0,
     'hasPermission'         :   _hasPermission,
     'calcMaxPermission'     :   _calcMaxPermission,
     'hasGreaterPermission'  :   _hasGreaterPermission
@@ -97,7 +97,7 @@ mongoose.model("PasswordSchema", PasswordSchema);
 exports.UserPermission = function (uuid, hash){
     this.user              =   uuid;
     this.perm              =   0;
-    this.password          =   new password(uuid, hash);
+    this.password          =   new PasswordSchema(uuid, hash);
 };
 
 exports.UserPermissionSchema = Schema({
@@ -123,7 +123,23 @@ this.UserPermission.prototype.granter =
     return ret;
 };
 
+// function having the sole authority to change user's permissions
+UserPermissionSchema.method.grant = function(granter, kingdom, perm, fn) {
+    Permission.hasGreaterPermission(granter, this, function(err) {
+        if (!err) {
+            // check if granter is trying to grant permission at most
+            // one level below his own
+            if (Permission.hasPermission(granter, kingdom, perm << 1)) {
+                this.perm.perm[kingdom.permEntry] = perm;
+                fn(null, perm);
+            } else {
+                // shall we
+            }
+        }
+    });
+};
 
+// revoke!!!!!
 
 /**
  * Kingdom's permissions structure

@@ -115,7 +115,7 @@ UserSchema.method.grant = function(granter, user, kingdom, perm, fn) {
     // see if granter is higher up than the user
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
-            user.perm.grant(granter, user, kingdom, perm, function(err, u) {
+            user.perm.grant(granter, kingdom, perm, function(err, u) {
                 if (!err) fn(null, u);
                 else fn('Granter cannot grant', null);
             });
