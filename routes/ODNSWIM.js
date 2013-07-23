@@ -12,6 +12,11 @@ var realm = require('./realm');
 var _ = require('underscore');
 var entity = require('./entity');
 
+// db
+var mongoose = require('mongoose')
+    , Schema = mongoose.Schema
+    , ObjectId = Schema.ObjectId;
+
 /** How ODNSWIM works:
  *  1. Login page generates aes hash of password, sends to server
  *  2. ODNSWIM generates a hash key of the hash and stores in DB
@@ -26,16 +31,24 @@ var _hasPermission = function(entity, kingdom, perm) {
     return (entity.perm.perm[kingdom.perm.permEntry] >= perm);
 };
 
-// a user's parent is his org
-// an org's parent is itself
 // every kingdom has to have a different permEntry!
 var _calcMaxPermission = function(entity, kingdom) {
     for (var p in Permission) {
-        if (Perm[p] == 0) return 0;
+        if (Perm[p] == 0) return Permission.none;
+
         if ((entity.perm[kingdom.perm.permEntry] & Perm[p]) &&
             (entity.parent.perm >= entity.perm[kingdom.perm.permEntry]))
             return Perm[p];
     }
+    // default save-my-ass
+    return Permission.none;
+};
+
+var _hasGreaterPermission = function(granter, user, fn) {
+    if ((granter.perm.admin > user.perm.admin) ||
+    (granter.perm.perm & user.perm.perm == Permission.god)) {
+        fn(null);
+    } else fn('Granter has lesser permission than user');
 };
 
 exports.Permission = {
@@ -47,7 +60,8 @@ exports.Permission = {
     'access':   1,
     'none'  :   0,
     'hasPermission'         :   _hasPermission,
-    'calcMaxPermission'     :   _calcMaxPermission
+    'calcMaxPermission'     :   _calcMaxPermission,
+    'hasGreaterPermission'  :   _hasGreaterPermission
 };
 
 /* Generate the key of received hash
@@ -69,13 +83,12 @@ function password(uuid, hash){
     this.hash      =   _generateKeyToMordor(hash);
 }
 
-/**
- * Permission verification functions
- */
-
-_permission = function(granter, resource) {
-    return ((granter.perm & resource.perm_mask) >> resource.perm_shift);
-};
+var PasswordSchema = Schema({
+    user:       String,
+    hash:       String
+});
+// register the model globally
+mongoose.model("PasswordSchema", PasswordSchema);
 
 /**
  * User's permissions structure
@@ -86,6 +99,13 @@ exports.UserPermission = function (uuid, hash){
     this.perm              =   0;
     this.password          =   new password(uuid, hash);
 };
+
+exports.UserPermissionSchema = Schema({
+    uuid:       String,
+    perm:       String,
+    password:   String
+});
+mongoose.model("UserPermissionSchema", UserPermissionSchema);
 
 this.UserPermission.prototype = {};
 
@@ -102,6 +122,8 @@ this.UserPermission.prototype.granter =
     }
     return ret;
 };
+
+
 
 /**
  * Kingdom's permissions structure
