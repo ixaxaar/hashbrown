@@ -9,31 +9,3 @@
 var mongoose = require('mongoose');
 mongoose.connect('mongodb://localhost/persistence');
 
-
-exports.fetchUsers = function(UserUUIDs) {
-
-}
-
-exports.commitUsers = function(Users) {
-
-}
-
-exports.fetchUser = function(uuid) {
-
-}
-
-exports.commitUser = function(user) {
-
-}
-
-exports.fetchUserData = function(user) {
-
-}
-
-exports.commitUserData = function(userData) {
-
-}
-
-exports.exists = function(uname) {
-
-}

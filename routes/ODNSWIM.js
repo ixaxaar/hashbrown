@@ -31,17 +31,19 @@ var _hasPermission = function(entity, kingdom, perm) {
     return (entity.perm.perm[kingdom.perm.permEntry] >= perm);
 };
 
+var _hasAdminPermission = function(entity, perm) {
+    return (entity.perm.admin >= perm);
+};
+
 // every kingdom has to have a different permEntry!
-var _calcMaxPermission = function(entity, kingdom) {
-    for (var p in Permission) {
-        if (Perm[p] == 0) return Permission.none;
+var _calcMaxPermission = function(entity, kingdom, fn) {
+    Permission.forEach(function(p) {
+        if (Perm[p] == 0) fn(Permission.none);
 
         if ((entity.perm[kingdom.perm.permEntry] & Perm[p]) &&
             (entity.parent.perm >= entity.perm[kingdom.perm.permEntry]))
-            return Perm[p];
-    }
-    // default save-my-ass
-    return Permission.none;
+            fn(Permission.nonePerm[p]);
+    });
 };
 
 var _hasGreaterPermission = function(granter, user, fn) {
@@ -60,6 +62,7 @@ exports.Permission = {
     'access':   1 << 1,
     'none'  :   1 << 0,
     'hasPermission'         :   _hasPermission,
+    'hasAdminPermission'    :   _hasAdminPermission,
     'calcMaxPermission'     :   _calcMaxPermission,
     'hasGreaterPermission'  :   _hasGreaterPermission
 };
@@ -133,6 +136,19 @@ UserPermissionSchema.method.revoke = function(granter, kingdom, perm, fn) {
                 fn("Does not have authority over module to revoke permission.");
             }
         } else fn("Does not have authority over user to revoke permission.");
+    });
+};
+
+// promote or demote a user's admin rights
+UserPermissionSchema.method.promote = function(granter, perm, fn) {
+    Permission.hasGreaterPermission(granter, this, function(err) {
+        if (!err) {
+            if (Permission.hasAdminPermission(granter, perm)) {
+                this.perm.admin = perm;
+                fn(null, this);
+            }
+            else fn('Granter does not have sufficient admin permissions');
+        } else fn('Granter has lesser permission than user', null);
     });
 };
 
@@ -214,9 +230,10 @@ exports.openBlackGate = function(req, res, next) {
     if (req.isAuthenticated()) {
         // okay, so the user is authenticated,
         // check if user has at least access premissions
-        if (Permission.calcMaxPermission(req.user, req.url) >= Permission.access)
-            return next();
-        else res.redirect('/login');
+        Permission.calcMaxPermission(req.user, req.url, function(p) {
+            if (p >= Permission.access) return next();
+            else res.redirect('/login');
+        });
     }
     else res.redirect('/login');
 };
