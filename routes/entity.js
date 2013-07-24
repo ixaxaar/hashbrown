@@ -45,7 +45,7 @@ mongoose.model("UserProfileSchema", UserProfileSchema);
  */
 
 var KingdomSchema = new Schema({
-    uuid:       String,
+    name:       String,
     perm:       ObjectId,
     package:    ObjectId
 });
@@ -180,6 +180,9 @@ exports.findByUsername = function(u, fn) {
  * The Kingdom Management functions
  */
 
+// static local array for storing all kingdoms - todo: commit to DB?
+var Kingdoms = [];
+
 KingdomSchema.method.add = function(pkg, shift, fn) {
     var kingdom =
         new KingdomSchema(uuid.v(),
@@ -192,12 +195,23 @@ KingdomSchema.method.add = function(pkg, shift, fn) {
             fn('WTF! God was denied permission', null);
             throw 'OMG WTF!';
         } else {
+            Kingdoms.push(kingdom);
             fn(null, kingdom);
         }
     });
 
 };
 
-KingdomSchema.method.remove = function(kngdom, fn) {
+KingdomSchema.method.remove = function(kingdom, fn) {
     // nothing to do here? lol
+    fn(null, kingdom);
 };
+
+KingdomSchema.method.findByUrl = function(url, fn) {
+    for (var k in Kingdoms) {
+        if (url.split('/')[0] == k.name) {
+            fn(null, k);
+        } else fn("Could not find kindom by the given url", null);
+    }
+};
+
