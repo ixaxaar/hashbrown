@@ -244,7 +244,6 @@ var checkOrgPermission = function(user, kingdom) {
 
 };
 
-
 /**
  * Permission evaluation function
  */
