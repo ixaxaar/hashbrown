@@ -9,7 +9,7 @@
 var express = require('express')
     , realm = require('./routes/realm')
     , fournotfour =  require('./routes/fournotfour')
-    , home = require('./routes/home')
+    , home = require('./routes/minas')
     , login = require('./routes/login')
     , http = require('http')
     , path = require('path')
@@ -85,7 +85,12 @@ app.get('/logout', function(req, res){
 // otherwise no other route will work
 app.all("*", mordor.openBlackGate);
 
-app.get('/', mordor.openBlackGate, home.home);
+// home page - where feeds may lie...
+app.get('/', mordor.openBlackGate, minas.tirith);
+
+// settings page, where every user can enter here,
+// but content is tailored depending on the user
+app.get('/settings', mordor.openBlackGate, minas.ithil);
 
 // initialize all APIs here
 
@@ -106,7 +111,7 @@ realm.narrowSea(app, fournotfour);
 // test API
 testAPI  = function(string) {
     console.log(string);
-}
+};
 realm.exposeAPI('test', 'test', testAPI);
 
 var cleanup = function() {
