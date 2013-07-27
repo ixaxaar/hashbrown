@@ -12,6 +12,11 @@ var realm = require('./realm');
 var _ = require('underscore');
 var entity = require('./entity');
 
+// db
+var mongoose = require('mongoose')
+    , Schema = mongoose.Schema
+    , ObjectId = Schema.ObjectId;
+
 /** How ODNSWIM works:
  *  1. Login page generates aes hash of password, sends to server
  *  2. ODNSWIM generates a hash key of the hash and stores in DB
@@ -26,28 +31,40 @@ var _hasPermission = function(entity, kingdom, perm) {
     return (entity.perm.perm[kingdom.perm.permEntry] >= perm);
 };
 
-// a user's parent is his org
-// an org's parent is itself
+var _hasAdminPermission = function(entity, perm) {
+    return (entity.perm.admin >= perm);
+};
+
 // every kingdom has to have a different permEntry!
-var _calcMaxPermission = function(entity, kingdom) {
-    for (var p in Permission) {
-        if (Perm[p] == 0) return 0;
+var _calcMaxPermission = function(entity, kingdom, fn) {
+    Permission.forEach(function(p) {
+        if (Perm[p] == 0) fn(Permission.none);
+
         if ((entity.perm[kingdom.perm.permEntry] & Perm[p]) &&
             (entity.parent.perm >= entity.perm[kingdom.perm.permEntry]))
-            return Perm[p];
-    }
+            fn(Permission.nonePerm[p]);
+    });
+};
+
+var _hasGreaterPermission = function(granter, user, fn) {
+    if ((granter.perm.admin > user.perm.admin) ||
+    (granter.perm.perm & user.perm.perm == Permission.god)) {
+        fn(null);
+    } else fn('Granter has lesser permission than user');
 };
 
 exports.Permission = {
-    'god'   :   15,
-    'org'   :   5,
-    'admin' :   4,
-    'mgr'   :   3,
-    'modify':   2,
-    'access':   1,
-    'none'  :   0,
+    'god'   :   1 << 15,
+    'org'   :   1 << 5,
+    'admin' :   1 << 4,
+    'mgr'   :   1 << 3,
+    'modify':   1 << 2,
+    'access':   1 << 1,
+    'none'  :   1 << 0,
     'hasPermission'         :   _hasPermission,
-    'calcMaxPermission'     :   _calcMaxPermission
+    'hasAdminPermission'    :   _hasAdminPermission,
+    'calcMaxPermission'     :   _calcMaxPermission,
+    'hasGreaterPermission'  :   _hasGreaterPermission
 };
 
 /* Generate the key of received hash
@@ -69,79 +86,87 @@ function password(uuid, hash){
     this.hash      =   _generateKeyToMordor(hash);
 }
 
-/**
- * Permission verification functions
- */
-
-_permission = function(granter, resource) {
-    return ((granter.perm & resource.perm_mask) >> resource.perm_shift);
-};
+var PasswordSchema = Schema({
+    user:       String,
+    hash:       String
+});
+// register the model globally
+mongoose.model("PasswordSchema", PasswordSchema);
 
 /**
  * User's permissions structure
  */
 
-exports.UserPermission = function (uuid, hash){
-    this.user              =   uuid;
-    this.perm              =   0;
-    this.password          =   new password(uuid, hash);
+exports.UserPermissionSchema = Schema({
+    uuid:       String,
+    perm:       Array,
+    admin:      Number,
+    password:   String
+});
+mongoose.model("UserPermissionSchema", UserPermissionSchema);
+
+// function having the sole authority to grant user's permissions
+UserPermissionSchema.method.grant = function(granter, kingdom, perm, fn) {
+    Permission.hasGreaterPermission(granter, this, function(err) {
+        if (!err) {
+            // check if granter is trying to grant permission at most
+            // one level below his own
+            if (Permission.hasPermission(granter, kingdom, perm << 1)) {
+                if (this.perm.perm[kingdom.permEntry] < perm)
+                    this.perm.perm[kingdom.permEntry] = perm;
+                fn(null, this.perm.perm[kingdom.permEntry]);
+            } else {
+                fn("Does not have authority over module to grant permission.");
+            }
+        } else fn("Does not have authority over user to grant permission.");
+    });
 };
 
-this.UserPermission.prototype = {};
+// function having the sole authority to revoke user's permissions
+UserPermissionSchema.method.revoke = function(granter, kingdom, perm, fn) {
+    Permission.hasGreaterPermission(granter, this, function(err) {
+        if (!err) {
+            // check if granter is trying to grant permission at most
+            // one level below his own
+            if (Permission.hasPermission(granter, kingdom, this.perm.perm[kingdom.permEntry] << 1)) {
+                if (this.perm.perm[kingdom.permEntry] > perm)
+                    this.perm.perm[kingdom.permEntry] = perm;
+                fn(null, this.perm.perm[kingdom.permEntry]);
+            } else {
+                fn("Does not have authority over module to revoke permission.");
+            }
+        } else fn("Does not have authority over user to revoke permission.");
+    });
+};
 
-// update the user's permission with respect to a module
-this.UserPermission.prototype.granter =
-    function(granter, user, kingdom, permission) {
-    var ret = false;
-
-    // granter has admin rights for the module
-    if (Permission.hasPermission(granter, kingdom, Permission['admin'])) {
-        // granter is asking to give permission within his rights
-        if (permission <= granter.perm[kingdom.perm.permEntry])
-            user.perm.perm[kingdom.perm.permEntry] = permission;
-    }
-    return ret;
+// promote or demote a user's admin rights
+UserPermissionSchema.method.promote = function(granter, perm, fn) {
+    Permission.hasGreaterPermission(granter, this, function(err) {
+        if (!err) {
+            if (Permission.hasAdminPermission(granter, perm)) {
+                this.perm.admin = perm;
+                fn(null, this);
+            }
+            else fn('Granter does not have sufficient admin permissions');
+        } else fn('Granter has lesser permission than user', null);
+    });
 };
 
 /**
  * Kingdom's permissions structure
  */
 
-exports.KingdomPermission = function (uuid, shift){
-    this.kingdom           =   uuid;
-    this.permEntry         =   shift;
-};
-
-this.KingdomPermission.prototype = {};
-
-/**
- * Permission evaluation function
- */
-
-// evaluate permissions for users
-exports.evalPermission = function(reqUrl, user, perm) {
-    var mod = realm.realm.getKingdoms(app);
-    var url = (reqUrl.split('/'))[0];
-
-    mod.forEach(function(m) {
-        if (m == url) {
-            mod = m;
-        }
-    });
-
-    // for accessing modules, an ACCESS permission is sufficient
-    // however, for other creating content, a CREATE permission is reqd.
-    // that will obviously be handled while creating content by the content mgr.
-    // only manager or admin can enter the control panel for e.g.
-    return Permission.hasPermission(user, mod, perm);
-};
+exports.KingdomPermissionSchema = Schema({
+    uuid:       String,
+    permEntry:  Number
+});
 
 /**
  * Construct the gates of MORDOR!
  */
 exports.BlackGate = BlackGate;
 
-function BlackGate(app, passport){
+function BlackGate(app, passport) {
     app.use(passport.initialize());
     app.use(passport.session());
 }
@@ -189,7 +214,7 @@ exports.createTheBlackGates = function(passport) {
                         return done(null, false, {message: 'Invalid password'});
                     }
                     else return done(null, user);
-                })
+                });
             });
         }
     ));
@@ -202,8 +227,42 @@ exports.createTheBlackGates = function(passport) {
 //   the request will proceed.  Otherwise, the user will be redirected to the
 //   login page.
 exports.openBlackGate = function(req, res, next) {
-    if (req.isAuthenticated()) { return next(); }
-    res.redirect('/login');
-}
+    if (req.isAuthenticated()) {
+        // okay, so the user is authenticated,
+        // check if user has at least access premissions
+        Permission.calcMaxPermission(req.user, req.url, function(p) {
+            if (p >= Permission.access) return next();
+            else res.redirect('/login');
+        });
+    }
+    else res.redirect('/login');
+};
+
+// check if a user's organization has access to this kingdom
+// an organization's permissions can only be altered by god :O
+var checkOrgPermission = function(user, kingdom) {
+
+};
 
 
+/**
+ * Permission evaluation function
+ */
+
+// evaluate permissions for users
+exports.evalPermission = function(reqUrl, user, perm) {
+    var mod = realm.realm.getKingdoms(app);
+    var url = (reqUrl.split('/'))[0];
+
+    mod.forEach(function(m) {
+        if (m == url) {
+            mod = m;
+        }
+    });
+
+    // for accessing modules, an ACCESS permission is sufficient
+    // however, for other creating content, a CREATE permission is reqd.
+    // that will obviously be handled while creating content by the content mgr.
+    // only manager or admin can enter the control panel for e.g.
+    return Permission.hasPermission(user, mod, perm);
+};

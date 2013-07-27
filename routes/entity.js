@@ -8,38 +8,66 @@
 
 var mordor = require('./ODNSWIM');
 var uuid = require('node-uuid');
-var heartbeat = require('./heartbeat');
 
-// Array Remove - By John Resig (MIT Licensed)
-Array.prototype.remove = function(from, to) {
-    var rest = this.slice((to || from) + 1 || this.length);
-    this.length = from < 0 ? this.length + from : from;
-    return this.push.apply(this, rest);
-};
+// db
+var mongoose = require('mongoose')
+    , Schema = mongoose.Schema
+    , ObjectId = Schema.ObjectId;
+
 
 /**
  * User Management structures
  */
 
-var UserProfile = function(uuid) {
-    this.uuid = uuid;
-    // compulsory fields of a user profile
-    this.name = '';
-    this.email = '';
-    // anything can be entered here
-    this.data = [];
-};
+var UserSchema = new Schema({
+    uuid:       String,
+    uid:        String,
+    profile:    ObjectId,
+    perm:       ObjectId,
+    parent:     ObjectId
+});
+// register the model globally
+mongoose.model("UserSchema", UserSchema);
 
-exports.User = function(req, uid, hash) {
-    this.uuid       =   uuid.v4();
-    this.id         =   uid;
-    this.profile    =   new UserProfile(this.uuid);
-    this.perm       =   new mordor.UserPermission(this.uuid, hash);
-    if (req) this.findByUuid(req.user.uuid, function(err, u) {
-            if (!err) this.parent = u;
-        }); // for admins, this has to be the organization
+/* TODO: phobi has to tell us what fields he needs here */
+var UserProfileSchema = new Schema({
+    uuid:       String,
+    uid:        String,
+    name:       String,
+    email:      String,
+    data:       []
+});
+// register the model globally
+mongoose.model("UserProfileSchema", UserProfileSchema);
 
-    if (uid === 'god') {
+/**
+ * Kingdom Management structures
+ */
+
+var KingdomSchema = new Schema({
+    name:       String,
+    perm:       ObjectId,
+    package:    ObjectId
+});
+// register the model globally
+mongoose.model("KingdomSchema", KingdomSchema);
+
+
+/** User Schema methods */
+
+var GOD = null;
+
+// add an user
+UserSchema.method.add = function(granter, uid, hash, fn) {
+    if (uid && hash) {
+        this.uuid       =   uuid.v4();
+        this.uid        =   uid;
+        this.profile    =   new UserProfileSchema(this.uuid, this.uid);
+        this.perm       =   new mordor.UserPermissionSchema(this.uuid, hash);
+    } else { fn('Invalid parameters', null); }
+
+    // see if god does not exist already
+    if ((uid === 'god') && (!GOD)) {
         // some special stuff, it's god after all!
         this.perm.perm = [mordor.Permission.god];
         this.parent = null;
@@ -47,111 +75,143 @@ exports.User = function(req, uid, hash) {
         // email god's password, do not store on server! :O
         heartbeat.notifyServerPassword(hash, null);
         console.log(hash);
-    }
+        fn(null, this);
+    } else if (req) {
+        // for all other users find the parent from the requestor
+        this.parent = UserSchema.find({uid: granter.uuid}, function(err, parent) {
+            // check if the granter has permission to add a user (at least mgr)
+            if (!err && user &&
+                (parent.perm.admin >= mordor.Permission.mgr))
+                return parent;
+            // note: point of contingency: this is the safe route,
+            // but something better can be done
+            else return GOD;
+        });
+
+        // commit this into the DB, god does not go here
+        this.save(function(err, user) {
+            if (!err) fn(null, user);
+            else fn('Could not save new user', null);
+        });
+    } else { fn(true, null); }
 };
 
-/**
- *  User Management methods
- */
-
-// All the users
-// for god, his password is different for different server instances
-// god's password can only be seen as console log
-var Users = [];
-
-// add god
-exports.init = function() {
-    this.add('god', uuid.v4(), null, function(err) {
-        if (err) console.log("Could not create god!: %s", err);
+// delete a user
+UserSchema.method.delete = function(granter, user, fn) {
+    // see if granter is higher up than the user
+    mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+        if (!err) {
+            // find and remove from the DB
+            UserSchema.find({uid: user.uuid}).remove(function(err, u) {
+                if (!err) fn(null, u);
+                else fn('Could not find user', null);
+            });
+        } else fn('Granter does not have permission to delete', null);
     });
-}
-
-exports.add = function(uid, hash, parent, fn) {
-    if (uid && hash){
-        Users.push(new this.User(null, uid, hash));
-        if (fn) fn(null);
-    }
-    else if (fn) fn("Could not add user");
 };
 
-// delete user
-this.User.prototype.delete = function(granter, user, fn) {
-    if (user && granter) {
-        if (mordor.Permission.admin <= granter.perm) {
-            var ctr = 0;
-            for (var u in Users) {
-                if(user == u) break;
-                ctr++;
-            }
-            Users.remove(ctr);
-            if (fn) fn(null)
-        }
-    } else if (fn) fn("arguments are not correct");
+// grant permissions to a user
+UserSchema.method.grant = function(granter, user, kingdom, perm, fn) {
+    // see if granter is higher up than the user
+    mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+        if (!err) {
+            user.perm.grant(granter, kingdom, perm, function(err, u) {
+                if (!err) fn(null, u);
+                else fn('Granter cannot grant', null);
+            });
+        } else fn('Granter does not have permission to grant', null);
+    });
 };
 
-// grant user some permission w.r.t a module
-this.User.prototype.grant = function(granter, user, kingdom, perm) {
-    if (user && granter && kingdom && perm)
-    //check if granter has permission to grant
-        if (mordor.Permission.hasPermission(granter, kingdom,
-            mordor.Permission.admin)) {
-            console.log("granted");
-            user.UserPermission.granter(granter, user, perm);
-        }
-    console.log("not granted");
+// reassociate a user to a different parent
+UserSchema.method.reassoc = function(granter, newParent, user, fn) {
+    // see if granter has permission to change user's parent
+    mordor.permission.hasGreaterPermission(granter, user.parent, function(err) {
+        if (!err) {
+            mordor.permission.hasGreaterPermission(granter, newParent, function(err) {
+                if (!err) {
+                    user.parent = newParent;
+                    fn(null, user);
+                } else fn('New parent is not qualified', null);
+            });
+        } else fn('Granter does not have permission to re-associate', null);
+    });
 };
 
-// associate user with different parent
-//this.User.prototype.reassoc
-//
-//// update a user's profile data
-//this.User.prototype.updateProfile
-//
-//// update a user's password
-//this.User.prototype.passwd
+// update a user's profile data
+UserSchema.method.updateProfile = function(granter, user, data, fn) {
+    // todo
+    fn(null, user);
+};
+
+UserSchema.method.passwd = function(granter, user, passwd, fn) {
+    // now this is a tricky one! - todo: does the user's manager has control?
+    mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+        if (!err) {
+            user.perm.changePasswd(grnter, passwd);
+            fn(null, user);
+        } else fn('Granter does not have permission to change password', null);
+    });
+};
+
+// update a user's admin status
+UserSchema.method.admin = function(granter, user, perm, fn) {
+    mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+        if (!err) {
+            user.perm.updateAdmin(granter, perm);
+            fn(false, user);
+        } else fn('Granter does not have permission to update admin', null);
+    });
+};
 
 /**
  * The User Management helpers
  */
 
-exports.findByUuid = function(uuid, fn) {
-    var ret = false;
-    Users.forEach(function (u) {
-        if (u.uuid == uuid) {
-            fn(null, u);
-            ret = true;
-        }
-    });
-    if (!ret) fn(null, null);
+exports.findByUuid = function(u, fn) {
+    UserSchema.find({ uuid: u }, fn);
 };
 
-exports.findByUsername = function(uid, fn) {
-    var ret = false;
-    Users.forEach(function (u) {
-        if (u.id == uid) {
-            fn(null, u);
-            ret = true;
-        }
-    });
-    if (!ret) fn(null, null);
+exports.findByUsername = function(u, fn) {
+    UserSchema.find({ uid: u }, fn);
 };
-
-
 
 /**
- * Kingdom Management structures
+ * The Kingdom Management functions
  */
-exports.Kingdom = function(pkg, shift) {
-    this.uuid = uuid.v4();
-    this.perm = new mordor.KingdomPermission(this.uuid, shift);
-    this.package = pkg;
 
-    // god is granted permissions to all kingdoms the moment they are created
-    // though this algo seems a tad idiotic, it is necessary to guard
-    // against random shift values
-    for (var ctr = 0; ctr <= shift; ctr++) {
-        if (!Users[0].perm.perm[ctr])
-            Users[0].perm.perm[ctr] = mordor.Permission.god;
+// static local array for storing all kingdoms - todo: commit to DB?
+var Kingdoms = [];
+
+KingdomSchema.method.add = function(pkg, shift, fn) {
+    var kingdom =
+        new KingdomSchema(uuid.v(),
+                        new KingdomPermSchema(shift),
+                        pkg);
+
+    // bow down before god the moment this is created!
+    if (GOD) GOD.grant(GOD, GOD, kingdom, mordor.Permission.god, function(err, god) {
+        if (err) {
+            fn('WTF! God was denied permission', null);
+            throw 'OMG WTF!';
+        } else {
+            Kingdoms.push(kingdom);
+            fn(null, kingdom);
+        }
+    });
+
+};
+
+KingdomSchema.method.remove = function(kingdom, fn) {
+    // nothing to do here? lol
+    fn(null, kingdom);
+};
+
+KingdomSchema.method.findByUrl = function(url, fn) {
+    for (var k in Kingdoms) {
+        if (url.split('/')[0] == k.name) {
+            fn(null, k);
+        } else fn("Could not find kindom by the given url", null);
     }
 };
 
