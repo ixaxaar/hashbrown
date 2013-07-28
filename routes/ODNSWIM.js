@@ -6,16 +6,16 @@
 
 /* ONE DOES NOT SIMPLY WALK INTO MORDOR */
 
+// External Dependencies
 var crypto = require("crypto");
 var LocalStrategy = require('passport-local').Strategy;
-var realm = require('./realm');
-var _ = require('underscore');
-var entity = require('./entity');
-
-// db
 var mongoose = require('mongoose')
     , Schema = mongoose.Schema
     , ObjectId = Schema.ObjectId;
+
+// Internal Dependencies
+var entity = require('./entity');
+
 
 /** How ODNSWIM works:
  *  1. Login page generates aes hash of password, sends to server
@@ -37,13 +37,9 @@ var _hasAdminPermission = function(entity, perm) {
 
 // every kingdom has to have a different permEntry!
 var _calcMaxPermission = function(entity, kingdom, fn) {
-    Permission.forEach(function(p) {
-        if (Perm[p] == 0) fn(Permission.none);
-
-        if ((entity.perm[kingdom.perm.permEntry] & Perm[p]) &&
-            (entity.parent.perm >= entity.perm[kingdom.perm.permEntry]))
-            fn(Permission.nonePerm[p]);
-    });
+    if ((entity.perm.perm.length - 1) >= kingdom.perm.permEntry) {
+        fn(null, entity.perm.perm[kingdom.perm.permEntry]);
+    } else fn('entity does not have any permissions for kingdom.', null);
 };
 
 var _hasGreaterPermission = function(granter, user, fn) {
@@ -81,29 +77,29 @@ function _generateKeyToMordor(hash) {
  * User's password hash structure
  */
 
-function password(uuid, hash){
-    this.user      =   uuid;
-    this.hash      =   _generateKeyToMordor(hash);
-}
-
 var PasswordSchema = Schema({
     user:       String,
     hash:       String
 });
+
+PasswordSchema.methods.Change = function(newhash) {
+    this.hash = newhash;
+}
+
 // register the model globally
-mongoose.model("PasswordSchema", PasswordSchema);
+var PasswordS = mongoose.model("PasswordSchema", PasswordSchema);
+exports.Password = PasswordS;
 
 /**
  * User's permissions structure
  */
 
-exports.UserPermissionSchema = Schema({
+UserPermissionSchema = Schema({
     uuid:       String,
     perm:       Array,
     admin:      Number,
-    password:   String
+    password:   [PasswordSchema]
 });
-mongoose.model("UserPermissionSchema", UserPermissionSchema);
 
 // function having the sole authority to grant user's permissions
 UserPermissionSchema.method.grant = function(granter, kingdom, perm, fn) {
@@ -128,7 +124,8 @@ UserPermissionSchema.method.revoke = function(granter, kingdom, perm, fn) {
         if (!err) {
             // check if granter is trying to grant permission at most
             // one level below his own
-            if (Permission.hasPermission(granter, kingdom, this.perm.perm[kingdom.permEntry] << 1)) {
+            if (Permission.hasPermission(granter, kingdom,
+                this.perm.perm[kingdom.permEntry] << 1)) {
                 if (this.perm.perm[kingdom.permEntry] > perm)
                     this.perm.perm[kingdom.permEntry] = perm;
                 fn(null, this.perm.perm[kingdom.permEntry]);
@@ -152,24 +149,51 @@ UserPermissionSchema.method.promote = function(granter, perm, fn) {
     });
 };
 
+var UserPermission = mongoose.model("UserPermissionSchema", UserPermissionSchema);
+exports.UserPermissionSchema = UserPermissionSchema;
+exports.UserPermission = UserPermission;
+
 /**
  * Kingdom's permissions structure
  */
 
-exports.KingdomPermissionSchema = Schema({
+KingdomPermissionSchema = Schema({
     uuid:       String,
     permEntry:  Number
 });
+
+var KingdomPermission = mongoose.model("KingdomPermissionSchema", KingdomPermissionSchema);
+exports.KingdomPermissionSchema = KingdomPermissionSchema;
+exports.KingdomPermission = KingdomPermission;
 
 /**
  * Construct the gates of MORDOR!
  */
 exports.BlackGate = BlackGate;
 
-function BlackGate(app, passport) {
+function BlackGate(app, express, passport) {
+    app.use(express.cookieParser('eylhjfgewhbfiwegqwgiqwhkbhkvgu'));
+    app.use(express.session({
+//        maxAge:new Date(Date.now() + 3600000),
+//        store: sessionStore
+    }));
     app.use(passport.initialize());
     app.use(passport.session());
 }
+
+sessionStore = {
+    get:    function(sid, callback) {
+
+    },
+
+    set:    function(sid, session, callback) {
+
+    },
+
+    destroy:    function(sid, callback) {
+
+    }
+};
 
 exports.createTheBlackGates = function(passport) {
     // Passport session setup.
@@ -236,32 +260,4 @@ exports.openBlackGate = function(req, res, next) {
         });
     }
     else res.redirect('/login');
-};
-
-// check if a user's organization has access to this kingdom
-// an organization's permissions can only be altered by god :O
-var checkOrgPermission = function(user, kingdom) {
-
-};
-
-/**
- * Permission evaluation function
- */
-
-// evaluate permissions for users
-exports.evalPermission = function(reqUrl, user, perm) {
-    var mod = realm.realm.getKingdoms(app);
-    var url = (reqUrl.split('/'))[0];
-
-    mod.forEach(function(m) {
-        if (m == url) {
-            mod = m;
-        }
-    });
-
-    // for accessing modules, an ACCESS permission is sufficient
-    // however, for other creating content, a CREATE permission is reqd.
-    // that will obviously be handled while creating content by the content mgr.
-    // only manager or admin can enter the control panel for e.g.
-    return Permission.hasPermission(user, mod, perm);
 };

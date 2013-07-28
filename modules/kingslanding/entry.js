@@ -21,25 +21,25 @@ var entity = require(process.cwd() + '/routes/entity');
 //by each sub-module
 module.exports = function () {
     app = express();
-    kingdom = new entity.Kingdom(require(process.cwd() +
-        '/modules/kingslanding/' + 'package.json'), 2);
+//    kingdom = new entity.Kingdom(require(process.cwd() +
+//        '/modules/kingslanding/' + 'package.json'), 2);
 
-    app.get(/.*/,function (req, res) {
-        checkAccess(req, res, function() {
-            var testapi = backend.getAPI('test', 'test');
-            if (testapi) testapi('hahahahaha');
-            res.send(req.path);
-        });
-    });
+//    app.get(/.*/,function (req, res) {
+//        checkAccess(req, res, function() {
+//            var testapi = backend.getAPI('test', 'test');
+//            if (testapi) testapi('hahahahaha');
+//            res.send(req.path);
+//        });
+//    });
 
     return app;
 }();
 
 
-// An example for access control to modules
-var checkAccess = function(req, res, fn) {
-    if (req.isAuthenticated() &&
-        mordor.Permission.hasPermission(req.user, kingdom, mordor.Permission.access))
-        {return fn();}
-    res.redirect('/login');
-};
+//// An example for access control to modules
+//var checkAccess = function(req, res, fn) {
+//    if (req.isAuthenticated() &&
+//        mordor.Permission.hasPermission(req.user, kingdom, mordor.Permission.access))
+//        {return fn();}
+//    res.redirect('/login');
+//};
