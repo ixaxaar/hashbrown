@@ -9,6 +9,8 @@
 // External Dependencies
 var crypto = require("crypto");
 var LocalStrategy = require('passport-local').Strategy;
+
+// db
 var mongoose = require('mongoose')
     , Schema = mongoose.Schema
     , ObjectId = Schema.ObjectId;
@@ -37,8 +39,9 @@ var _hasAdminPermission = function(entity, perm) {
 
 // every kingdom has to have a different permEntry!
 var _calcMaxPermission = function(entity, kingdom, fn) {
-    if ((entity.perm.perm.length - 1) >= kingdom.perm.permEntry) {
-        fn(null, entity.perm.perm[kingdom.perm.permEntry]);
+    console.log(kingdom)
+    if ((entity.perm[0].perm.length - 1) >= kingdom.perm.permEntry) {
+        fn(null, entity.perm[0].perm[kingdom.perm.permEntry]);
     } else fn('entity does not have any permissions for kingdom.', null);
 };
 
@@ -49,7 +52,7 @@ var _hasGreaterPermission = function(granter, user, fn) {
     } else fn('Granter has lesser permission than user');
 };
 
-exports.Permission = {
+var Permission = {
     'god'   :   1 << 15,
     'org'   :   1 << 5,
     'admin' :   1 << 4,
@@ -62,6 +65,7 @@ exports.Permission = {
     'calcMaxPermission'     :   _calcMaxPermission,
     'hasGreaterPermission'  :   _hasGreaterPermission
 };
+exports.Permission = Permission;
 
 /* Generate the key of received hash
  */
@@ -83,8 +87,8 @@ var PasswordSchema = Schema({
 });
 
 PasswordSchema.methods.Change = function(newhash) {
-    this.hash = newhash;
-}
+    this.hash = _generateKeyToMordor(newhash);
+};
 
 // register the model globally
 var PasswordS = mongoose.model("PasswordSchema", PasswordSchema);
@@ -203,12 +207,12 @@ exports.createTheBlackGates = function(passport) {
     //   the user by ID when deserializing.
     passport.serializeUser(function(user, done) {
 //        entity.add(user, function(u){
-            done(null, user.uuid);
+            done(null, user.uid);
 //        });
     });
 
     passport.deserializeUser(function(id, done) {
-        entity.findByUuid(id, function(err, u) {
+        entity.findByUsername(id, function(err, u) {
             done(err, u);
         });
     });
@@ -233,11 +237,14 @@ exports.createTheBlackGates = function(passport) {
                         {message: 'Unknown user ' + username }); }
 
                     // match password
-                    if (user.perm.password.hash !=
+                    if (user.perm[0].password[0].hash !=
                         _generateKeyToMordor(password)) {
                         return done(null, false, {message: 'Invalid password'});
                     }
-                    else return done(null, user);
+                    else {
+                        console.log('User auth passed');
+                        return done(null, user);
+                    }
                 });
             });
         }
@@ -252,12 +259,18 @@ exports.createTheBlackGates = function(passport) {
 //   login page.
 exports.openBlackGate = function(req, res, next) {
     if (req.isAuthenticated()) {
-        // okay, so the user is authenticated,
-        // check if user has at least access premissions
-        Permission.calcMaxPermission(req.user, req.url, function(p) {
-            if (p >= Permission.access) return next();
-            else res.redirect('/login');
-        });
+        if (req.url.split('/')[1] != '') {
+            // okay, so the user is authenticated,
+            // check if user has at least access premissions
+            entity.findKingdomByUrl(req.url.split('/')[1], function(err, k) {
+                if (!err && k) {
+                    Permission.calcMaxPermission(req.user, k, function(p) {
+                        if (p >= Permission.access) return next();
+                        else res.redirect('/');
+                    });
+                } else res.redirect('/');
+            });
+        } else return next();
     }
     else res.redirect('/login');
 };

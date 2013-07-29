@@ -8,10 +8,12 @@
 
 // External dependencies
 var uuid = require('node-uuid');
+
+// db
 var mongoose = require('mongoose')
     , Schema = mongoose.Schema
     , ObjectId = Schema.ObjectId;
-
+mongoose.connect('mongodb://localhost/persistence');
 
 // Internal dependencies
 var mordor = require('./ODNSWIM');
@@ -53,10 +55,11 @@ UserSchema.methods.Add = function(granter, uid, hash, fn) {
         this.profile    =   new UserProfile({uuid: this.uuid,
                                             uid: this.uid});
         this.perm       =   new mordor.UserPermission({uuid: this.uuid,
-            admin: 0,
-            password: new mordor.Password({user:  this.uuid,
-                hash: hash})
+                            admin: 0,
+                            password: new mordor.Password({user:  this.uuid,
+                            hash: hash})
         });
+        this.perm[0].password[0].Change(hash);
 
         // see if god does not exist already
         if ((uid === 'god') && (!GOD)) {
@@ -191,7 +194,7 @@ var User = mongoose.model("UserSchema", UserSchema);
 var KingdomSchema = new Schema({
     name:       String,
     perm:       [mordor.KingdomPermissionSchema],
-    package:    ObjectId
+    pkg:        []
 });
 
 /**
@@ -208,36 +211,39 @@ KingdomSchema.methods.Add = function(pkg, shift, fn) {
 
     var kingdom =
         new Kingdom({name: id,
-            perm: new kps({uuid: id, permEntry: shift}),
-            package: pkg});
+            perm: new kps({uuid: id, permEntry: shift})});
+    kingdom.pkg.push(pkg);
 
     // bow down before god the moment this is created!
-    if (GOD) GOD.grant(GOD, GOD, kingdom, mordor.Permission.god, function(err, god) {
-        if (err) {
-            fn('WTF! God was denied permission', null);
-            throw 'OMG WTF!';
-        } else {
-            Kingdoms.push(kingdom);
-            fn(null, kingdom);
-        }
-    });
+    GOD.perm[0].perm[shift] = mordor.Permission.god;
+    Kingdoms.push(kingdom);
+    fn(null, kingdom);
 };
 
 KingdomSchema.methods.Remove = function(kingdom, fn) {
     // nothing to do here? lol
-    fn(null, kingdom);
+    var ctr = 0;
+    Kingdoms.forEach(function(k) {
+        if (k.name == kingdom.name) {
+            Kingdoms.remove(ctr);
+            return fn(null, kingdom);
+        }
+        ctr++;
+    });
+
+    return fn('Could not remove kingdom', kingdom);
 };
 
-KingdomSchema.methods.findByUrl = function(url, fn) {
-    for (var k in Kingdoms) {
-        if (url.split('/')[0] == k.name) {
-            fn(null, k);
-        } else fn("Could not find kindom by the given url", null);
-    }
+exports.findKingdomByUrl = function(name, fn) {
+    Kingdoms.forEach(function(k) {
+        if (k.pkg[0].name == name) fn(null, k);
+        else fn('Could not find kingdom', null);
+    })
 };
 
 // register the model globally
 var Kingdom = mongoose.model("KingdomSchema", KingdomSchema);
+exports.Kingdom = Kingdom;
 
 /** APIs exposed */
 
@@ -349,7 +355,9 @@ requestRouter = function(req, res, next) {
 };
 
 AddUser = function(reqJSON, granter, res) {
-    UserSchema.Add(granter, reqJSON.username, reqJSON.password,
+    var u = new User({});
+
+    u.Add(granter, reqJSON.username, reqJSON.password,
         function(err, u) {
             if (err || !u)
                 res.send(new result('Add', 'Could not create user', false));
@@ -362,7 +370,7 @@ AddUser = function(reqJSON, granter, res) {
 
 DeleteUser = function(reqJSON, granter, res) {
     exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err) UserSchema.Delete(granter, u,
+        if (!err) u.Delete(granter, u,
             function(err, u) {
                 if (err || !u)
                     res.send(new result('Delete', 'Could not delete user', false));
@@ -376,7 +384,7 @@ DeleteUser = function(reqJSON, granter, res) {
 
 Promote = function(reqJSON, granter, res) {
     exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err) UserSchema.Promote(granter, u, reqJSON.permission,
+        if (!err) u.Promote(granter, u, reqJSON.permission,
             function(err, u) {
                 if (err || !u)
                     res.send(new result('Promote', 'Could not promote user', false));
@@ -390,7 +398,7 @@ Promote = function(reqJSON, granter, res) {
 
 Grant = function(reqJSON, granter, res) {
     exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err) UserSchema.Grant(granter, u, reqJSON.kingdom, reqJSON.permission,
+        if (!err) u.Grant(granter, u, reqJSON.kingdom, reqJSON.permission,
             function(err, u) {
                 if (err || !u)
                     res.send(new result('Grant', 'Could not grant user', false));
@@ -404,7 +412,7 @@ Grant = function(reqJSON, granter, res) {
 
 Revoke = function(reqJSON, granter, res) {
     exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err) UserSchema.Revoke(granter, u, reqJSON.kingdom, reqJSON.permission,
+        if (!err) u.Revoke(granter, u, reqJSON.kingdom, reqJSON.permission,
             function(err, u) {
                 if (err || !u)
                     res.send(new result('Revoke', 'Could not revoke user', false));
@@ -421,7 +429,7 @@ Reassociate = function(reqJSON, granter, res) {
         if (err) res.send(new result('Revoke', 'No such user exists', false));
         else
             exports.findByUsername(reqJSON.newParent, function(err, p) {
-                if (!err) UserSchema.Reassoc(granter, u, p,
+                if (!err) u.Reassoc(granter, u, p,
                     function(err, u) {
                         if (err || !u)
                             res.send(new result('Revoke', 'Could not reassociate user', false));
@@ -435,9 +443,11 @@ Reassociate = function(reqJSON, granter, res) {
 };
 
 exports.findByUuid = function(u, fn) {
-    UserSchema.find({ uuid: u }, fn);
+    // god cannot be found by uuid! :D
+    return User.find({ uuid: u }, fn);
 };
 
 exports.findByUsername = function(u, fn) {
-    UserSchema.find({ uid: u }, fn);
+    if (u == 'god') return fn(null, GOD);
+    else return User.find({ uid: u }, fn);
 };
