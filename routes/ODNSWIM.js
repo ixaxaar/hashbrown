@@ -123,6 +123,9 @@ UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) 
                     }
 
                     user.perm[0].perm[kingdom.perm[0].permEntry] = perm;
+                    // note: direct access to mongoose arrays need to be
+                    // explicitly marked as modified, else mongo will not save
+                    user.perm[0].markModified('perm');
                 }
                 fn(null, user);
             } else {
