@@ -149,13 +149,15 @@ exports.enterKingdom = function(app, kingdomName){
     try {
         realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
-                // add the routing middleware
-                app.use('/' + kingdom.name,
-                    require(process.cwd() +
-                        '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
                 var k = new entity.Kingdom({});
                 k.Add(kingdom, KingdomCtr, function(err, kd) {
-                    if (!err) ret = true;
+                    if (!err) {
+                        // add the routing middleware
+                        app.use('/' + kingdom.name,
+                            require(process.cwd() +
+                                '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
+                        ret = true;
+                    }
                     KingdomCtr++;
                 });
             }

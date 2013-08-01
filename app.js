@@ -73,7 +73,7 @@ app.post('/login', function(req, res, next) {
 app.get('/logout', function(req, res){
     req.logout();
     req.session.destroy(function(err) {
-        console.log('Could not destroy session');
+        if (err) console.log('Could not destroy session');
     });
     res.redirect('/login');
 });

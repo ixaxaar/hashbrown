@@ -40,7 +40,7 @@ var UserSchema = new Schema({
     uid:        String,
     profile:    [UserProfileSchema],
     perm:       [mordor.UserPermissionSchema],
-    parent:     ObjectId
+    parent:     String
 });
 
 /** User Schema methods */
@@ -49,51 +49,64 @@ var GOD = null;
 
 // add an user
 UserSchema.methods.Add = function(granter, uid, hash, fn) {
-    if (uid && hash) {
-        this.uuid       =   uuid.v4();
-        this.uid        =   uid;
-        this.profile    =   new UserProfile({uuid: this.uuid,
-                                            uid: this.uid});
-        this.perm       =   new mordor.UserPermission({uuid: this.uuid,
-                            admin: 0,
-                            password: new mordor.Password({user:  this.uuid,
+    var that = this;
+    if (uid == 'god' || mordor.Permission.hasAdminPermission(granter, mordor.Permission.mgr)) {
+        findByUsername(uid, function(err, existsUser) {
+            if (!err && existsUser == null) {
+                if (uid && hash) {
+                    that.uuid       =   uuid.v4();
+                    that.uid        =   uid;
+                    that.profile    =   new UserProfile({uuid: this.uuid,
+                        uid: this.uid});
+                    that.perm       =   new mordor.UserPermission({uuid: this.uuid,
+                        admin: 0,
+                        password: new mordor.Password({user:  this.uuid,
                             hash: hash})
+                    });
+                    that.perm[0].password[0].Change(hash);
+
+                    // see if god does not exist already
+                    if ((uid === 'god') && (!GOD)) {
+                        // some special stuff, it's god after all!
+                        that.perm[0].perm = [mordor.Permission.god];
+                        that.perm[0].admin = mordor.Permission.god;
+                        that.parent = null;
+
+                        // email god's password, do not store on server! :O
+                        heartbeat.notifyServerPassword(hash, null);
+                        console.log(hash);
+                        fn(null, that);
+                    } else {
+                        // for all other users find the parent from the requestor
+                        User.findOne({uuid: granter.uuid}, function(err, parent) {
+                            // check if the granter has permission to add a user (at least mgr)
+                            if (!err && (parent != null) &&
+                                (parent.perm[0].admin >= mordor.Permission.mgr)) {
+                                that.parent =  parent.uuid;
+
+                                // save the new user onto the DB
+                                that.save(function(err, user) {
+                                    if (!err) fn(null, user);
+                                    else fn('Could not save new user ' + err, null);
+                                });
+                            }
+                            // note: point of contingency: this is the safe route,
+                            // but something better can be done
+                            else if (granter.uid == 'god') {
+                                that.parent =  GOD.uuid;
+                                // save the new user onto the DB
+                                that.save(function(err, user) {
+                                    if (!err) fn(null, user);
+                                    else fn('Could not save new user ' + err, null);
+                                });
+                            }
+                            else throw 'Security: User exists but is not in DB?';
+                        });
+                    }
+                } else { fn('Invalid parameters', null); }
+            } else { fn('User name is taken', null); }
         });
-        this.perm[0].password[0].Change(hash);
-
-        // see if god does not exist already
-        if ((uid === 'god') && (!GOD)) {
-            // some special stuff, it's god after all!
-            this.perm[0].perm = [mordor.Permission.god];
-            this.perm[0].admin = mordor.Permission.god;
-            this.parent = null;
-
-            // email god's password, do not store on server! :O
-            heartbeat.notifyServerPassword(hash, null);
-            console.log(hash);
-            fn(null, this);
-        } else if (req) {
-            // for all other users find the parent from the requestor
-            this.parent = UserSchema.find({uid: granter.uuid}, function(err, parent) {
-                // check if the granter has permission to add a user (at least mgr)
-                if (!err && user &&
-                    (parent.perm.admin >= mordor.Permission.mgr))
-                    return parent;
-                // note: point of contingency: this is the safe route,
-                // but something better can be done
-                else return GOD;
-            });
-
-            // only managers and above can add a user
-            if (mordor.Permission.hasAdminPermission(granter, mordor.Permission.mgr)) {
-                this.save(function(err, user) {
-                    if (!err) fn(null, user);
-                    else fn('Could not save new user', null);
-                });
-            } else fn('Granter does not have permission to add user', null);
-
-        } else { fn(true, null); }
-    } else { fn('Invalid parameters', null); }
+    } else fn('Granter does not have permission to add user', null);
 };
 
 // delete a user
@@ -102,9 +115,9 @@ UserSchema.methods.Delete = function(granter, user, fn) {
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
             // find and remove from the DB
-            UserSchema.find({uid: user.uuid}).remove(function(err, u) {
+            User.find({uuid: user.uuid}).remove(function(err, u) {
                 if (!err) fn(null, u);
-                else fn('Could not find user', null);
+                else fn('Could not find and delete user', null);
             });
         } else fn('Granter does not have permission to delete', null);
     });
@@ -112,14 +125,18 @@ UserSchema.methods.Delete = function(granter, user, fn) {
 
 // grant permissions to a user
 UserSchema.methods.Grant = function(granter, user, kingdom, perm, fn) {
-    // see if granter is higher up than the user
-    mordor.Permission.hasGreaterPermission(granter, user, function(err) {
-        if (!err) {
-            user.perm.grant(granter, kingdom, perm, function(err, u) {
-                if (!err) fn(null, u);
-                else fn('Granter cannot grant', null);
+    exports.findKingdomByUrl(kingdom, function(err, k) {
+        if (!err && k) {
+            // see if granter is higher up than the user
+            mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+                if (!err) {
+                    user.perm[0].grant(granter, user, k, perm, function(err, u) {
+                        if (!err) fn(null, u);
+                        else fn(err, null);
+                    });
+                } else fn('Granter does not have permission to grant', null);
             });
-        } else fn('Granter does not have permission to grant', null);
+        }
     });
 };
 
@@ -128,7 +145,7 @@ UserSchema.methods.Revoke = function(granter, user, kingdom, perm, fn) {
     // see if granter is higher up than the user
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
-            user.perm.revoke(granter, kingdom, perm, function(err, u) {
+            user.perm[0].revoke(granter, kingdom, perm, function(err, u) {
                 if (!err) fn(null, u);
                 else fn('Granter cannot grant', null);
             });
@@ -137,20 +154,21 @@ UserSchema.methods.Revoke = function(granter, user, kingdom, perm, fn) {
 };
 
 UserSchema.methods.Promote = function(granter, user, perm, fn) {
-    user.perm.promote(granter, perm, function(err, u) {
+    user.perm[0].promote(granter, user, perm, function(err, u) {
         if (err) fn('Could not promote');
         else fn(null, u);
     });
-}
+};
 
 // reassociate a user to a different parent
+// todo: rewrite
 UserSchema.methods.Reassoc = function(granter, user, newParent, fn) {
     // see if granter has permission to change user's parent
     mordor.permission.hasGreaterPermission(granter, user.parent, function(err) {
         if (!err) {
             mordor.permission.hasGreaterPermission(granter, newParent, function(err) {
                 if (!err) {
-                    user.parent = newParent;
+                    user.parent = newParent.uuid;
                     fn(null, user);
                 } else fn('New parent is not qualified', null);
             });
@@ -168,7 +186,7 @@ UserSchema.methods.Passwd = function(granter, user, passwd, fn) {
     // now this is a tricky one! - todo: does the user's manager has control?
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
-            user.perm.changePasswd(grnter, passwd);
+            user.perm[0].changePasswd(grnter, passwd);
             fn(null, user);
         } else fn('Granter does not have permission to change password', null);
     });
@@ -178,7 +196,7 @@ UserSchema.methods.Passwd = function(granter, user, passwd, fn) {
 UserSchema.methods.Admin = function(granter, user, perm, fn) {
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
-            user.perm.updateAdmin(granter, perm);
+            user.perm[0].updateAdmin(granter, perm);
             fn(false, user);
         } else fn('Granter does not have permission to update admin', null);
     });
@@ -277,75 +295,201 @@ var sendException = function(e, recovery) {
     console.log("Exception occured while processing request");
 };
 
-// constructor creates god
-EntityTree = function (app) {
-    try {
-        if (!parentApp) parentApp = app;
-        var newuser = new User({});
+AddUser = function(reqJSON, granter, res) {
+    var u = new User({});
 
-        newuser.Add(null, 'god', uuid.v4(), function(err, g) {
-            if (err) throw err;
-            if (!g) throw 'User object returned is null';
-            if (g) GOD = g;
+    u.Add(granter, reqJSON.username, reqJSON.password,
+        function(err, u) {
+            if (err || !u)
+                res.send(new result('Add', err, false));
+            else
+                res.send(new result('Add',
+                    'User ' + reqJSON.username + ' created', true));
         });
-
-        // every internal function of UserSchema is exposed via this.schema
-        this.schema = UserSchema;
-        this.kingdom = KingdomSchema;
-
-        app.post('/user-settings', requestRouter);
-
-    } catch (e) { sendException(e, null); }
-
-    return this;
 };
 
-exports.Setup = EntityTree;
 
-requestRouter = function(req, res, next) {
+DeleteUser = function(reqJSON, granter, res) {
+    exports.findByUsername(reqJSON.username, function(err, u) {
+        if (!err && u) u.Delete(granter, u,
+            function(err, delu) {
+                if (err)
+                    res.send(new result('Delete', err, false));
+                else
+                    res.send(new result('Delete',
+                        'User ' + reqJSON.username + ' deleted', true));
+            });
+        else res.send(new result('Add', 'No such user exists', false));
+    });
+};
+
+Promote = function(reqJSON, granter, res) {
+    exports.findByUsername(reqJSON.username, function(err, u) {
+        if (!err && u) {
+            //parse the permissio from JSON request
+            var perm = mordor.Permission.none;
+            switch(reqJSON.permission) {
+                case 'access':
+                    perm = mordor.Permission.access;
+                    break;
+                case 'modify':
+                    perm = mordor.Permission.modify;
+                    break;
+                case 'mgr':
+                    perm = mordor.Permission.mgr;
+                    break;
+                case 'admin':
+                    perm = mordor.Permission.admin;
+                    break;
+                case 'org':
+                    perm = mordor.Permission.org;
+                    break;
+                default:
+                    // lol?
+                    perm = u.perm[0].admin;
+                    break;
+            }
+
+            u.Promote(granter, u, perm,
+                function(err, pu) {
+                    if (err || !pu)
+                        res.send(new result('Promote', err, false));
+                    else {
+                        pu.save(function(err) {
+                            if (!err) res.send(new result('Promote',
+                                'User ' + reqJSON.username + ' promoted', true));
+                            else res.send('Promote', 'Could not promote user', false);
+                        });
+
+                    }
+                });
+        }
+        else res.send(new result('Add', 'No such user exists', false));
+    });
+};
+
+Grant = function(reqJSON, granter, res) {
+    exports.findByUsername(reqJSON.username, function(err, u) {
+        var perm = mordor.Permission.none;
+        switch(reqJSON.permission) {
+            case 'access':
+                perm = mordor.Permission.access;
+                break;
+            case 'modify':
+                perm = mordor.Permission.modify;
+                break;
+            case 'mgr':
+                perm = mordor.Permission.mgr;
+                break;
+            case 'admin':
+                perm = mordor.Permission.admin;
+                break;
+            case 'org':
+                perm = mordor.Permission.org;
+                break;
+            default:
+                // lol?
+                perm = u.perm[0].admin;
+                break;
+        }
+
+        if (!err && u) u.Grant(granter, u, reqJSON.kingdom, perm,
+            function(err, pu) {
+                if (err || !pu)
+                    res.send(new result('Grant', err, false));
+                else {
+                    console.log(pu.perm)
+                    pu.save(function(err, spu) {
+                        console.log(spu.perm[0])
+                        if (!err) res.send(new result('Grant',
+                            'User ' + reqJSON.username + ' granted', true));
+                        else res.send('Grant', 'Could not grant user', false);
+                    });
+                }
+
+            });
+        else res.send(new result('Grant', 'No such user exists', false));
+    });
+};
+
+Revoke = function(reqJSON, granter, res) {
+    exports.findByUsername(reqJSON.username, function(err, u) {
+        if (!err && u) u.Revoke(granter, u, reqJSON.kingdom, reqJSON.permission,
+            function(err, u) {
+                if (err || !u)
+                    res.send(new result('Revoke', 'Could not revoke user', false));
+                else
+                    res.send(new result('Revoke',
+                        'User ' + reqJSON.username + ' revoked', true));
+            });
+        else res.send(new result('Revoke', 'No such user exists', false));
+    });
+};
+
+Reassociate = function(reqJSON, granter, res) {
+    exports.findByUsername(reqJSON.username, function(err, u) {
+        if (err && u) res.send(new result('Revoke', 'No such user exists', false));
+        else
+            exports.findByUsername(reqJSON.newParent, function(err, p) {
+                if (!err && p) u.Reassoc(granter, u, p,
+                    function(err, u) {
+                        if (err || !u)
+                            res.send(new result('Revoke', 'Could not reassociate user', false));
+                        else
+                            res.send(new result('Revoke',
+                                'User ' + reqJSON.username + ' reassociated', true));
+                    });
+                else res.send(new result('Revoke', 'No such user exists', false));
+            });
+    });
+};
+
+var requestRouter = function(req, res, next) {
     req.accepts('application/json');
     var ret = false;
 
     /*
-         req has to have a certain JSON structure with these fields:
-         {
-         type: type, // type of request
-         req: {} // request body
-         }
+     req has to have a certain JSON structure with these fields:
+     {
+     type: type, // type of request
+     req: {} // request body
+     }
      */
     try {
-        if (req && res && req.params.type && req.params.user)
-            switch (req.type) {
+        if (req.body)
+            switch (req.body.type) {
                 case 'Add':
-                    AddUser(req.params.req, req.user, res);
+                    AddUser(req.body.req, req.user, res);
                     ret = true;
                     break;
                 case 'Delete':
-                    DeleteUser(req.params.req, req.user, res);
+                    DeleteUser(req.body.req, req.user, res);
                     ret = true;
                     break;
                 case 'Promote':
-                    Promote(req.params.req, req.user, res);
+                    Promote(req.body.req, req.user, res);
                     ret = true;
                     break;
                 case 'Grant':
-                    Grant(req.params.req, req.user, res);
+                    Grant(req.body.req, req.user, res);
                     ret = true;
                     break;
                 case 'Revoke':
-                    Revoke(req.params.req, req.user, res);
+                    Revoke(req.body.req, req.user, res);
                     ret = true;
                     break;
                 case 'Reassociate':
-                    Reassociate(req.params.req, req.user, res);
+                    Reassociate(req.body.req, req.user, res);
                     ret = true;
                     break;
                 default:
+                    res.send(new result(req.type,
+                        'Failed to service request, type not found', false));
                     break;
             }
         else
             res.send(new result(req.type,
-                'Failed to service request, type not found', false));
+                'Failed to service request, somethings not right', false));
 
     } catch (e) {
         sendException(e, function() {
@@ -354,100 +498,39 @@ requestRouter = function(req, res, next) {
     }
 };
 
-AddUser = function(reqJSON, granter, res) {
-    var u = new User({});
+// constructor creates god
+EntityTree = function (app) {
+    try {
+        if (!parentApp) parentApp = app;
+        var newuser = new User({});
 
-    u.Add(granter, reqJSON.username, reqJSON.password,
-        function(err, u) {
-            if (err || !u)
-                res.send(new result('Add', 'Could not create user', false));
-            else
-                res.send(new result('Add',
-                    'User' + reqJSON.username + 'created', true));
+        newuser.Add(null, 'god', uuid.v4(), function(err, u) {
+            if (err) throw err;
+            if (!u) throw 'User object returned is null';
+            if (u) GOD = u;
         });
+
+        // every internal function of UserSchema is exposed via this.schema
+        this.schema = UserSchema;
+        this.kingdom = KingdomSchema;
+
+        app.post('/', mordor.openBlackGate, requestRouter);
+
+    } catch (e) { sendException(e, null); }
+
+    return this;
 };
 
+exports.Setup = EntityTree;
 
-DeleteUser = function(reqJSON, granter, res) {
-    exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err) u.Delete(granter, u,
-            function(err, u) {
-                if (err || !u)
-                    res.send(new result('Delete', 'Could not delete user', false));
-                else
-                    res.send(new result('Delete',
-                        'User' + reqJSON.username + 'deleted', true));
-            });
-        else res.send(new result('Add', 'No such user exists', false));
-    });
-};
-
-Promote = function(reqJSON, granter, res) {
-    exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err) u.Promote(granter, u, reqJSON.permission,
-            function(err, u) {
-                if (err || !u)
-                    res.send(new result('Promote', 'Could not promote user', false));
-                else
-                    res.send(new result('Promote',
-                        'User' + reqJSON.username + 'deleted', true));
-            });
-        else res.send(new result('Add', 'No such user exists', false));
-    });
-};
-
-Grant = function(reqJSON, granter, res) {
-    exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err) u.Grant(granter, u, reqJSON.kingdom, reqJSON.permission,
-            function(err, u) {
-                if (err || !u)
-                    res.send(new result('Grant', 'Could not grant user', false));
-                else
-                    res.send(new result('Grant',
-                        'User' + reqJSON.username + 'granted', true));
-            });
-        else res.send(new result('Grant', 'No such user exists', false));
-    });
-};
-
-Revoke = function(reqJSON, granter, res) {
-    exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err) u.Revoke(granter, u, reqJSON.kingdom, reqJSON.permission,
-            function(err, u) {
-                if (err || !u)
-                    res.send(new result('Revoke', 'Could not revoke user', false));
-                else
-                    res.send(new result('Revoke',
-                        'User' + reqJSON.username + 'revoked', true));
-            });
-        else res.send(new result('Revoke', 'No such user exists', false));
-    });
-};
-
-Reassociate = function(reqJSON, granter, res) {
-    exports.findByUsername(reqJSON.username, function(err, u) {
-        if (err) res.send(new result('Revoke', 'No such user exists', false));
-        else
-            exports.findByUsername(reqJSON.newParent, function(err, p) {
-                if (!err) u.Reassoc(granter, u, p,
-                    function(err, u) {
-                        if (err || !u)
-                            res.send(new result('Revoke', 'Could not reassociate user', false));
-                        else
-                            res.send(new result('Revoke',
-                                'User' + reqJSON.username + 'reassociated', true));
-                    });
-                else res.send(new result('Revoke', 'No such user exists', false));
-            });
-    });
-};
-
-exports.findByUuid = function(u, fn) {
+var findByUuid = function(u, fn) {
     // god cannot be found by uuid! :D
-    return User.find({ uuid: u }, fn);
+    return User.findOne({ uuid: u }, fn);
 };
+exports.findByUuid = findByUuid;
 
-exports.findByUsername = function(u, fn) {
+var findByUsername = function(u, fn) {
     if (u == 'god') return fn(null, GOD);
-    else return User.find({ uid: u }, fn);
+    else return User.findOne({ uid: u }, fn);
 };
+exports.findByUsername = findByUsername;

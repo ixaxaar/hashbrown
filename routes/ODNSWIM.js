@@ -30,24 +30,23 @@ var entity = require('./entity');
  */
 
 var _hasPermission = function(entity, kingdom, perm) {
-    return (entity.perm.perm[kingdom.perm.permEntry] >= perm);
+    return (entity.perm[0].perm[kingdom.perm[0].permEntry] >= perm);
 };
 
 var _hasAdminPermission = function(entity, perm) {
-    return (entity.perm.admin >= perm);
+    return (entity.perm[0].admin > perm);
 };
 
 // every kingdom has to have a different permEntry!
 var _calcMaxPermission = function(entity, kingdom, fn) {
-    console.log(kingdom)
-    if ((entity.perm[0].perm.length - 1) >= kingdom.perm.permEntry) {
-        fn(null, entity.perm[0].perm[kingdom.perm.permEntry]);
+    if (entity.perm[0].perm[kingdom.perm[0].permEntry]) {
+        fn(null, entity.perm[0].perm[kingdom.perm[0].permEntry]);
     } else fn('entity does not have any permissions for kingdom.', null);
 };
 
 var _hasGreaterPermission = function(granter, user, fn) {
-    if ((granter.perm.admin > user.perm.admin) ||
-    (granter.perm.perm & user.perm.perm == Permission.god)) {
+    if ((granter.perm[0].admin > user.perm[0].admin) ||
+    (granter.perm[0].admin & user.perm[0].admin == Permission.god)) {
         fn(null);
     } else fn('Granter has lesser permission than user');
 };
@@ -71,7 +70,7 @@ exports.Permission = Permission;
  */
 
 //todo: this is not fit for shared multiple instances, fetch from DB
-var salt = crypto.randomBytes(256);
+var salt = '';//crypto.randomBytes(256);
 
 function _generateKeyToMordor(hash) {
     return salt + crypto.createHash("md5").update(hash).digest("hex");
@@ -100,39 +99,50 @@ exports.Password = PasswordS;
 
 UserPermissionSchema = Schema({
     uuid:       String,
-    perm:       Array,
+    perm:       [Number],
     admin:      Number,
     password:   [PasswordSchema]
 });
 
 // function having the sole authority to grant user's permissions
-UserPermissionSchema.method.grant = function(granter, kingdom, perm, fn) {
-    Permission.hasGreaterPermission(granter, this, function(err) {
+UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) {
+    Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
             // check if granter is trying to grant permission at most
             // one level below his own
             if (Permission.hasPermission(granter, kingdom, perm << 1)) {
-                if (this.perm.perm[kingdom.permEntry] < perm)
-                    this.perm.perm[kingdom.permEntry] = perm;
-                fn(null, this.perm.perm[kingdom.permEntry]);
+                if ((!user.perm[0].perm[kingdom.perm[0].permEntry]) ||
+                    (user.perm[0].perm[kingdom.perm[0].permEntry] < perm)) {
+                    // do some gymnastics
+                    console.log(user.perm[0].perm)
+                    var ctr = 0;
+                    while(ctr <= kingdom.perm[0].permEntry) {
+                        if (user.perm[0].perm[ctr] == null)
+                            user.perm[0].perm.push(0);
+                        ctr++;
+                    }
+
+                    user.perm[0].perm[kingdom.perm[0].permEntry] = perm;
+                }
+                fn(null, user);
             } else {
-                fn("Does not have authority over module to grant permission.");
+                fn("Does not have authority over module to grant permission.", null);
             }
-        } else fn("Does not have authority over user to grant permission.");
+        } else fn("Does not have authority over user to grant permission.", null);
     });
 };
 
 // function having the sole authority to revoke user's permissions
-UserPermissionSchema.method.revoke = function(granter, kingdom, perm, fn) {
-    Permission.hasGreaterPermission(granter, this, function(err) {
+UserPermissionSchema.methods.revoke = function(granter, user, kingdom, perm, fn) {
+    Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
             // check if granter is trying to grant permission at most
             // one level below his own
             if (Permission.hasPermission(granter, kingdom,
-                this.perm.perm[kingdom.permEntry] << 1)) {
-                if (this.perm.perm[kingdom.permEntry] > perm)
-                    this.perm.perm[kingdom.permEntry] = perm;
-                fn(null, this.perm.perm[kingdom.permEntry]);
+                user.perm[0].perm[kingdom.perm[0].permEntry] << 1)) {
+                if (user.perm[0].perm[kingdom.perm[0].permEntry] > perm)
+                    user.perm[0].perm[kingdom.perm[0].permEntry] = perm;
+                fn(null, user[0].perm.perm[kingdom.perm[0].permEntry]);
             } else {
                 fn("Does not have authority over module to revoke permission.");
             }
@@ -141,12 +151,12 @@ UserPermissionSchema.method.revoke = function(granter, kingdom, perm, fn) {
 };
 
 // promote or demote a user's admin rights
-UserPermissionSchema.method.promote = function(granter, perm, fn) {
-    Permission.hasGreaterPermission(granter, this, function(err) {
+UserPermissionSchema.methods.promote = function(granter, user, perm, fn) {
+    Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
             if (Permission.hasAdminPermission(granter, perm)) {
-                this.perm.admin = perm;
-                fn(null, this);
+                user.perm[0].admin = perm;
+                fn(null, user);
             }
             else fn('Granter does not have sufficient admin permissions');
         } else fn('Granter has lesser permission than user', null);
@@ -258,19 +268,24 @@ exports.createTheBlackGates = function(passport) {
 //   the request will proceed.  Otherwise, the user will be redirected to the
 //   login page.
 exports.openBlackGate = function(req, res, next) {
+    var r = false;
+    var u = req.url.split('/')[1];
+
     if (req.isAuthenticated()) {
-        if (req.url.split('/')[1] != '') {
+        if (u != '') {
             // okay, so the user is authenticated,
             // check if user has at least access premissions
-            entity.findKingdomByUrl(req.url.split('/')[1], function(err, k) {
+            entity.findKingdomByUrl(u, function(err, k) {
                 if (!err && k) {
-                    Permission.calcMaxPermission(req.user, k, function(p) {
-                        if (p >= Permission.access) return next();
-                        else res.redirect('/');
+                    Permission.calcMaxPermission(req.user, k, function(err, p) {
+                        if ((!err) && (p >= Permission.access)) r = true;
                     });
-                } else res.redirect('/');
+                }
             });
-        } else return next();
+        } else r = true;
+
+        if (r) return next();
+        else return res.redirect('/');
     }
-    else res.redirect('/login');
+    else return res.redirect('/login');
 };
