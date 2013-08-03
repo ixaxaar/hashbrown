@@ -46,7 +46,7 @@ var _calcMaxPermission = function(entity, kingdom, fn) {
 
 var _hasGreaterPermission = function(granter, user, fn) {
     if ((granter.perm[0].admin > user.perm[0].admin) ||
-    (granter.perm[0].admin & user.perm[0].admin == Permission.god)) {
+    ((granter.perm[0].admin & user.perm[0].admin) == Permission.god)) {
         fn(null);
     } else fn('Granter has lesser permission than user');
 };
@@ -114,7 +114,6 @@ UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) 
                 if ((!user.perm[0].perm[kingdom.perm[0].permEntry]) ||
                     (user.perm[0].perm[kingdom.perm[0].permEntry] < perm)) {
                     // do some gymnastics
-                    console.log(user.perm[0].perm)
                     var ctr = 0;
                     while(ctr <= kingdom.perm[0].permEntry) {
                         if (user.perm[0].perm[ctr] == null)
@@ -126,8 +125,10 @@ UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) 
                     // note: direct access to mongoose arrays need to be
                     // explicitly marked as modified, else mongo will not save
                     user.perm[0].markModified('perm');
+                    fn(null, user);
+                } else {
+                    fn('Permission is already granted', null);
                 }
-                fn(null, user);
             } else {
                 fn("Does not have authority over module to grant permission.", null);
             }
@@ -143,13 +144,30 @@ UserPermissionSchema.methods.revoke = function(granter, user, kingdom, perm, fn)
             // one level below his own
             if (Permission.hasPermission(granter, kingdom,
                 user.perm[0].perm[kingdom.perm[0].permEntry] << 1)) {
-                if (user.perm[0].perm[kingdom.perm[0].permEntry] > perm)
+                // modify the permission if the permission does not exist or
+                if (user.perm[0].perm[kingdom.perm[0].permEntry] > perm) {
+                    // do some gymnastics
+                    console.log(user.perm[0].perm[kingdom.perm[0].permEntry])
+                    console.log(perm)
+                    var ctr = 0;
+                    while(ctr <= kingdom.perm[0].permEntry) {
+                        if (user.perm[0].perm[ctr] == null)
+                            user.perm[0].perm.push(0);
+                        ctr++;
+                    }
+
                     user.perm[0].perm[kingdom.perm[0].permEntry] = perm;
-                fn(null, user[0].perm.perm[kingdom.perm[0].permEntry]);
+                    // note: direct access to mongoose arrays need to be
+                    // explicitly marked as modified, else mongo will not save
+                    user.perm[0].markModified('perm');
+                    fn(null, user);
+                } else {
+                    fn('Permission is already revoked', null);
+                }
             } else {
-                fn("Does not have authority over module to revoke permission.");
+                fn("Does not have authority over module to grant permission.", null);
             }
-        } else fn("Does not have authority over user to revoke permission.");
+        } else fn("Does not have authority over user to grant permission.", null);
     });
 };
 
@@ -194,6 +212,7 @@ function BlackGate(app, express, passport) {
 //        maxAge:new Date(Date.now() + 3600000),
 //        store: sessionStore
     }));
+//    require('connect-redis')(express);
     app.use(passport.initialize());
     app.use(passport.session());
 }

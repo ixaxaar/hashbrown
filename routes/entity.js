@@ -143,13 +143,18 @@ UserSchema.methods.Grant = function(granter, user, kingdom, perm, fn) {
 // revoke permissions from a user
 UserSchema.methods.Revoke = function(granter, user, kingdom, perm, fn) {
     // see if granter is higher up than the user
-    mordor.Permission.hasGreaterPermission(granter, user, function(err) {
-        if (!err) {
-            user.perm[0].revoke(granter, kingdom, perm, function(err, u) {
-                if (!err) fn(null, u);
-                else fn('Granter cannot grant', null);
+    exports.findKingdomByUrl(kingdom, function(err, k) {
+        if (!err && k) {
+            // see if granter is higher up than the user
+            mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+                if (!err) {
+                    user.perm[0].revoke(granter, user, k, perm, function(err, u) {
+                        if (!err) fn(null, u);
+                        else fn(err, null);
+                    });
+                } else fn('Granter does not have permission to revoke', null);
             });
-        } else fn('Granter does not have permission to grant', null);
+        }
     });
 };
 
@@ -164,15 +169,23 @@ UserSchema.methods.Promote = function(granter, user, perm, fn) {
 // todo: rewrite
 UserSchema.methods.Reassoc = function(granter, user, newParent, fn) {
     // see if granter has permission to change user's parent
-    mordor.permission.hasGreaterPermission(granter, user.parent, function(err) {
+    findByUuid(user.parent, function(err, p) {
         if (!err) {
-            mordor.permission.hasGreaterPermission(granter, newParent, function(err) {
+            // In case of any dangling children, adopt them, like init does (re-assess this strategy)
+            if (!p) p = GOD;
+            mordor.Permission.hasGreaterPermission(granter, p, function(err) {
                 if (!err) {
-                    user.parent = newParent.uuid;
-                    fn(null, user);
-                } else fn('New parent is not qualified', null);
+                    mordor.Permission.hasGreaterPermission(granter, newParent, function(err) {
+                        if (!err) {
+                            user.parent = newParent.uuid;
+                            fn(null, user);
+                        } else fn('New parent is not qualified', null);
+                    });
+                } else fn('Granter does not have permission to re-associate', null);
             });
-        } else fn('Granter does not have permission to re-associate', null);
+        } else {
+            fn('Existing parent not found');
+        }
     });
 };
 
@@ -276,7 +289,7 @@ var parentApp = null;
 
 var sendException = function(e, recovery) {
     // throw all exceptions in a dev environment
-    if ('development' == parentApp.get('env')) throw e;
+//    if ('development' == parentApp.get('env')) throw e;
 
     // whatever you do not, throw an exception here
     if (heartbeat.report) {
@@ -398,9 +411,7 @@ Grant = function(reqJSON, granter, res) {
                 if (err || !pu)
                     res.send(new result('Grant', err, false));
                 else {
-                    console.log(pu.perm)
                     pu.save(function(err, spu) {
-                        console.log(spu.perm[0])
                         if (!err) res.send(new result('Grant',
                             'User ' + reqJSON.username + ' granted', true));
                         else res.send('Grant', 'Could not grant user', false);
@@ -414,13 +425,40 @@ Grant = function(reqJSON, granter, res) {
 
 Revoke = function(reqJSON, granter, res) {
     exports.findByUsername(reqJSON.username, function(err, u) {
-        if (!err && u) u.Revoke(granter, u, reqJSON.kingdom, reqJSON.permission,
-            function(err, u) {
-                if (err || !u)
-                    res.send(new result('Revoke', 'Could not revoke user', false));
-                else
-                    res.send(new result('Revoke',
-                        'User ' + reqJSON.username + ' revoked', true));
+        var perm = mordor.Permission.none;
+        switch(reqJSON.permission) {
+            case 'access':
+                perm = mordor.Permission.access;
+                break;
+            case 'modify':
+                perm = mordor.Permission.modify;
+                break;
+            case 'mgr':
+                perm = mordor.Permission.mgr;
+                break;
+            case 'admin':
+                perm = mordor.Permission.admin;
+                break;
+            case 'org':
+                perm = mordor.Permission.org;
+                break;
+            default:
+                // lol?
+                perm = u.perm[0].admin;
+                break;
+        }
+        if (!err && u) u.Revoke(granter, u, reqJSON.kingdom, perm,
+            function(err, pu) {
+                if (err || !pu)
+                    res.send(new result('Revoke', err, false));
+                else {
+                    pu.save(function(err, spu) {
+                        if (!err) res.send(new result('Revoke',
+                            'User ' + reqJSON.username + ' revoked', true));
+                        else res.send(new result('Revoke', 'No such user exists', false));
+                    });
+                }
+
             });
         else res.send(new result('Revoke', 'No such user exists', false));
     });
@@ -428,18 +466,23 @@ Revoke = function(reqJSON, granter, res) {
 
 Reassociate = function(reqJSON, granter, res) {
     exports.findByUsername(reqJSON.username, function(err, u) {
-        if (err && u) res.send(new result('Revoke', 'No such user exists', false));
+        if (err || !u) res.send(new result('Reassociate', 'No such user exists', false));
         else
             exports.findByUsername(reqJSON.newParent, function(err, p) {
                 if (!err && p) u.Reassoc(granter, u, p,
-                    function(err, u) {
-                        if (err || !u)
-                            res.send(new result('Revoke', 'Could not reassociate user', false));
-                        else
-                            res.send(new result('Revoke',
-                                'User ' + reqJSON.username + ' reassociated', true));
+                    function(err, pu) {
+                        if (err || !pu)
+                            res.send(new result('Reassociate', err, false));
+                        else {
+                            pu.save(function(err, spu) {
+                                if (!err)
+                                    res.send(new result('Reassociate',
+                                        'User ' + reqJSON.username + ' reassociated', true));
+                                else res.send(new result('Grant', 'Could not save', false));
+                            });
+                        }
                     });
-                else res.send(new result('Revoke', 'No such user exists', false));
+                else res.send(new result('Reassociate', 'No such user exists', false));
             });
     });
 };
@@ -534,3 +577,9 @@ var findByUsername = function(u, fn) {
     else return User.findOne({ uid: u }, fn);
 };
 exports.findByUsername = findByUsername;
+
+
+// som eof the functions that might be useful when the GUI is up
+//ListAllUsersWithThisParent(granter)
+//FindUser()
+//SeeOrgStructure()
