@@ -10,6 +10,7 @@
     "passport": "*",
     "passport-local": "*",
     "connect-flash": "*",
+    "connect-redis": "*",
     "underscore": "*",
     "bcrypt": "*",
     "nodemailer": "*",
