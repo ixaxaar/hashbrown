@@ -10,10 +10,12 @@
     "passport": "*",
     "passport-local": "*",
     "connect-flash": "*",
+    "connect-redis": "*",
     "underscore": "*",
     "bcrypt": "*",
     "nodemailer": "*",
     "node-uuid": "*",
+    "mongoose": "*",
     "jade": "*"
   },
   "devDependencies": {

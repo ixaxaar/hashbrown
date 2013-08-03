@@ -7,6 +7,8 @@
 // gloooobal :O
 var realm = require(process.cwd() + '/modules/modules.json');
 
+var entity = require('./entity');
+
 // the 404 function
 var narrowSea = function(req, res) {
     res.send(404);
@@ -137,8 +139,9 @@ exports.initKingdom = function(app, kingdomName){
     }
 
     return ret;
-}
+};
 
+var KingdomCtr = 0;
 
 exports.enterKingdom = function(app, kingdomName){
     var ret = false;
@@ -146,11 +149,17 @@ exports.enterKingdom = function(app, kingdomName){
     try {
         realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
-                // add the routing middleware
-                app.use('/' + kingdom.name,
-                    require(process.cwd() +
-                        '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
-                ret = true;
+                var k = new entity.Kingdom({});
+                k.Add(kingdom, KingdomCtr, function(err, kd) {
+                    if (!err) {
+                        // add the routing middleware
+                        app.use('/' + kingdom.name,
+                            require(process.cwd() +
+                                '/modules/' + kingdom.dirName + '/' + kingdom.scripts.entry));
+                        ret = true;
+                    }
+                    KingdomCtr++;
+                });
             }
         });
     } catch (err) {
@@ -161,7 +170,7 @@ exports.enterKingdom = function(app, kingdomName){
     }
 
     return ret;
-}
+};
 
 exports.leaveKingdom = function(app, kingdomName){
     var ret = false;
@@ -192,7 +201,7 @@ exports.leaveKingdom = function(app, kingdomName){
     }
 
     return ret;
-}
+};
 
 
 exports.createKingdom = function(app, rootDir){
@@ -233,7 +242,7 @@ exports.createKingdom = function(app, rootDir){
     }
 
     return ret;
-}
+};
 
 
 exports.destroyKingdom = function(app, kingdomName){
@@ -262,7 +271,7 @@ exports.destroyKingdom = function(app, kingdomName){
     }
 
     return ret;
-}
+};
 
 
 exports.syncExports = function(app, jsonVariable, jsonFile){
@@ -284,7 +293,7 @@ exports.syncExports = function(app, jsonVariable, jsonFile){
     }
 
     return true;
-}
+};
 
 exports.ExposedAPIs = [];
 
@@ -313,7 +322,7 @@ exports.exposeAPI = function(apiName, apiModule, apiHandle){
     }
 
     return ret;
-}
+};
 
 exports.unexposeAPI = function(apiName, apiModule){
     var ret = false;
@@ -332,7 +341,7 @@ exports.unexposeAPI = function(apiName, apiModule){
     }
 
     return ret;
-}
+};
 
 exports.getAPI = function(apiName, apiModule){
     var ret = null;
@@ -347,4 +356,4 @@ exports.getAPI = function(apiName, apiModule){
     }
 
     return ret;
-}
+};
