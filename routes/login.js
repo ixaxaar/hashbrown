@@ -12,5 +12,5 @@
  */
 
 exports.login = function(req, res){
-    res.render('home', { title: 'Login' });
+    res.render('login', { title: 'Login' });
 };

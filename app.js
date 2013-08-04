@@ -32,8 +32,8 @@ app.configure('development', function(){
     app.use(express.bodyParser());
     app.use(express.methodOverride());
     mordor.BlackGate(app, express, passport);
-    app.use(app.router);
     app.use(express.static(path.join(__dirname, 'public')));
+    app.use(app.router);
 })
 
 //TODO: define production env
