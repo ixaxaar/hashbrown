@@ -1,7 +1,18 @@
 
 // schema library
 var mongoose = require('mongoose');
+var uuid = require('node-uuid');
 
+////////////////////////////////
+//   Content Schema
+////////////////////////////////
+
+var ContentSchema = new Schema({
+	uuid: { type: String, default: uuid.v4() },
+	video: , // uuid of the uploaded file
+});
+
+var Content = mongoose.model("ContentSchema", ContentSchema);
 
 ////////////////////////////////
 //   Feed Schema
@@ -9,14 +20,18 @@ var mongoose = require('mongoose');
 
 // feed schema
 var FeedSchema = new Schema({
-	owner: String, // the owner's _id
+	uuid: { type: String, default: uuid.v4() },
+	owner: String, // the owner's uid
 	created: { type : Date, default: Date.now },
 	updated: { type : Date, default: Date.now },
-	content: String, // the content object's _id
+	content: [ContentSchema], // the content object
 	tags: [String], // tags to group similar feeds
 	acl: [String] // list of people having access to this
 	children: [String] // linked-list of child feeds
 });
+
+FeedSchema.index({owner: 1, updated: -1});
+function(err){ if (err) console.log('ensureIndexes failed'); }
 
 FeedSchema.methods.save = function(user, content, tagList, fn) {
 	this.created = Date.now;

@@ -31,6 +31,7 @@ var UserProfileSchema = new Schema({
     email:      String,
     data:       []
 });
+
 // register the model globally
 var UserProfile = mongoose.model("UserProfileSchema", UserProfileSchema);
 
@@ -42,6 +43,8 @@ var UserSchema = new Schema({
     perm:       [mordor.UserPermissionSchema],
     parent:     String
 });
+
+UserSchema.index({uid: 1});
 
 /** User Schema methods */
 
@@ -217,6 +220,7 @@ UserSchema.methods.Admin = function(granter, user, perm, fn) {
 
 // register the model globally
 var User = mongoose.model("UserSchema", UserSchema);
+User.ensureIndexes(function(err){ if (err) console.log('ensureIndexes failed')});
 
 /**
  * Kingdom Management structures
