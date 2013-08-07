@@ -16,6 +16,7 @@
     "nodemailer": "*",
     "node-uuid": "*",
     "mongoose": "*",
+    "memcached": "*",
     "jade": "*"
   },
   "devDependencies": {
