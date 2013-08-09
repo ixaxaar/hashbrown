@@ -20,7 +20,9 @@ module.exports = function () {
 
     app.get(/.*/, function (req, res) {
         res.send(req.path);
-    })
+    });
+
+    app.post(/.*/, require("./lib/feed"));
 
     return app;
 }();

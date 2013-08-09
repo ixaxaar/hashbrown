@@ -11,13 +11,14 @@ Array.prototype.remove = function(from, to) {
 };
 
 ////////////////////////////////
-//   Content Feed Schema
+//   Content Schema
 ////////////////////////////////
 
 var ContentSchema = new Schema({
-    id: String, // uuid of the uploaded file
+    id: String, // uuid of the uploaded file (one feed = one file)
     type: String, // mime-type of the content (can be string, video doc, etc)
-    location: String // where does this content reside
+    location: String, // where does this content reside
+    description: String // markdown
 });
 
 var Content = mongoose.model("ContentSchema", ContentSchema);
@@ -55,6 +56,7 @@ var Tag = mongoose.model("TagSchema", TagSchema);
 var FeedSchema = new Schema({
     uuid: { type: String, default: uuid.v4() },
     owner: String, // the owner's uuid
+    private: Boolean, // for private posts
     created: { type : Date, default: Date.now },
     updated: { type : Date, default: Date.now },
     content: [ContentSchema], // the content object
@@ -64,18 +66,42 @@ var FeedSchema = new Schema({
 });
 FeedSchema.index({owner: 1, updated: -1});
 
-FeedSchema.methods.Save = function(user, content, tagList, fn) {
+FeedSchema.methods.CreateFeed = function(user, json, fn) {
+//    {
+//        "content": "",		// markdown
+//        "file": "",			// filename to be uploaded
+//        "belongs": [],		// team (optional if private)
+//        "mentions": [],		// array of team-mates (optional)
+//        "private": "",		// boolean - private or public post
+//        "tags": []			// optional - tags for faster searching
+//    }
+
     this.created = Date.now;
-    this.owner = user._id;
-    this.content = content;
+    this.owner = user.uid;
+    this.content = json.content;
     this.children = [];
 
     var that = this;
-    if (tagList.length > 1) {
+
+    // if the activity is private
+    if (json.private) {
+        this.private = true;
+    } else {
+    }
+
+    if (tagList.length) {
         tagList.forEach(function(t) {
             that.tags.push(t);
         });
     }
+
+    // add and update other user's feeds
+    json.mentions.forEach(function(m) {
+        // make sure this query is covered
+        Users.findOne({ uid: m }, { uid: 1 }, function(err, u) {
+            if (!err && u) that.acl.push(u);
+        });
+    });
 
     // 'updated' gets autoupdated here
     this.save(function(err, t) {
@@ -96,13 +122,14 @@ FeedSchema.methods.ModifyContent = function(content, fn) {
 
 FeedSchema.methods.AddTag = function(tag, fn) {
     // append to the access control list
-    if (this.tags.push(tag)) {
+    var t =  new Tag({name: tag});
+    if (this.tags.push(t)) {
         this.updated = Date.now;
         this.save(function(err, u) {
             if (err) fn(err, null);
             else fn(null, u);
         });
-    } else fn('Could not grant tag', null);
+    } else fn('Could not add tag', null);
 };
 
 FeedSchema.methods.RemoveTag = function(tag, fn) {
@@ -184,58 +211,10 @@ var findFeed = function(uuid, fn) {
 };
 exports.FindFeed = findFeed;
 
-// Feed APIs
-// NOTE: user here is passed from  req.user
-
-// sample feed JSON request
-//{
-//    proj: project,
-//    content: {},
-//    tagList: []
-//}
-
-// todo: who will ensure that the json content is sane (not html etc etc security shit)
-exports.NewFeed = function(User, json, fn) {
-    var f = new Feed({});
-
-    user.Find(User.uuid, function(err, u) {
-        json.tagList.push(json.proj); // project is also a tag!
-
-        // verify if user has permission to all projects (some tags are projects)
-        if (!err && u) user.hasModifyPermission(u, json.tagList, function(err, pu) {
-            // save the feed
-            if (!err && pu) f.Save(pu, json.content, json.tagList, function(err, nf) {
-                // update the user's stack with new content in the background
-                pu.feedStack.Push(nf);
-                fn(null, nf);
-            });
-            else fn('User does not have permission to create new feed', null);
-        });
-        else fn('Could not create new feed', null);
-    });
+module.exports = RequestRouter;
+RequestRouter = function(req, res, next) {
 };
 
-exports.newChildFeed = function(User, json, fn) {
-    findFeed(json.feedId, function(err, f) {
-        if (!err && f) f.AddChild(User, json.content, function(err, mf) {
-            // do some updations to all those subscribed to this main feed
-            user.Find(mf.owner, function(err, o) {
-                // this is supposed to delete any earlier references to
-                // this feed and re-add it to the user's stack
-                o.feedStack.Push(mf);
-            });
-            // push this update to all others in the access control list
-            mf.acl.forEach(function(uid) {
-                user.Find(uid, function(err, u) {
-                    if (!err && u) u.feedStack.Push(mf);
-                });
-            });
-            // okay.. done :D
-            fn(null, mf);
-        });
-        else fn('Wrong parent feed', null);
-    });
-};
 
 // todo: implement caching in memcached
 
@@ -257,4 +236,3 @@ FeedStackSchema.methods.Push = function(feed) {
 };
 
 var FeedStack = mongoose.model("FeedStackSchema", FeedStackSchema);
-exports.FeedStack = FeedStack;
