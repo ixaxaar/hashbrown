@@ -34,7 +34,15 @@ var OrganizationSchema = new Schema({
     dbName: { type: String, default: uuid.v4() },
     teams: [String]
 });
-TeamSchema.index({ name: 1 });
+OrganizationSchema.index({ name: 1 });
+
+OrganizationSchema.virtual('conections')
+    .get(function () {
+        //
+    })
+    .set(function() {
+        //
+    });
 
 // this has to be inside cause every schema is mapped to its mongoose connection
 OrganizationSchema.methods.Connect = function(fn) {
@@ -56,6 +64,23 @@ OrganizationSchema.methods.Connect = function(fn) {
             teams: [String]
         });
         TeamSchema.index({ name: 1 , orgname: 1 });
+
+        TeamSchema.methods.CreateTeam = function () {
+            //
+        };
+
+        TeamSchema.methods.Connect = function() {
+            //
+        };
+
+        TeamSchema.methods.Disconnect = function() {
+            //
+        };
+
+        TeamSchema.methods.Destroy = function() {
+            //
+        };
+
         var team = mongoose.model("TeamSchema", TeamSchema);
         team.ensureIndexes(function(err)
             { if (err) consolelog("ensureInedxes failed") } );
@@ -67,8 +92,24 @@ OrganizationSchema.methods.Connect = function(fn) {
     } else return (fn) && fn('No database connection provided');
 };
 
+OrganizationSchema.methods.Disconnect = function(fn) {
+    //
+};
+
+OrganizationSchema.methods.Create = function() {
+    //
+};
+
+OrganizationSchema.methods.Destroy = function() {
+    //
+};
+
 var Organization = mongoose.model("OrganizationSchema", OrganizationSchema);
 Organization.ensureIndexes( function(err) { if (err) consolelog("ensureInedxes failed") } );
+
+Organization.statics.Find = function(name, fn) {
+    this.findOne({"name": name }, fn);
+};
 
 ////////////////////////////////
 //   Winterfell Schema
@@ -127,6 +168,36 @@ var CreateOrganization = function(json, fn) {
     });
 };
 
+/**
+ * json request structure:
+ * {
+ *  name: String
+ * }
+ */
+var ConnectOrganization = function(json, fn) {
+    Organization.findOne({ name: json.name }, function(err, o) {
+        if (!err && o) {
+            var connected = false;
+            connections.forEach(function(c) {
+                if (c.name == org.name) {
+                    connected = true;
+                }
+            });
+
+            if (!connected) org.Connect(function(err, goose, team) {
+                if (!err && goose && team) {
+                    connections.push({
+                        "name": org.name,
+                        "mongoose": goose,
+                        "team": team
+                    });
+                    fn(null, so);
+                } else fn('Could not connect to organizations database', so);
+            });
+            else fn("Already connected");
+        } else fn('Could not find organization');
+    });
+};
 
 /**
  * json request structure:
@@ -152,3 +223,6 @@ var DisconnectOrganization = function(json, fn) {
         } else fn('Could not find organization');
     });
 };
+
+//DestroyORganization : todo
+
