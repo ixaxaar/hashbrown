@@ -18,35 +18,39 @@ mongoose.connect('mongodb://localhost/persistence');
 // Internal dependencies
 var mordor = require('./ODNSWIM');
 var heartbeat = require('./heartbeat');
+var team = require('./team');
 
-/**
- * User Management structures
- */
+////////////////////////////////
+//   Users
+////////////////////////////////
 
-/* TODO: phobi has to tell us what fields he needs here */
+// @phobi, @pranaya - these are for you guys to decide ^_^
 var UserProfileSchema = new Schema({
     uuid:       String,
     uid:        String,
     name:       String,
     email:      String,
-    data:       []
+    data:       [{
+        aboutme: String,
+        interests: [String],
+        hailsfrom: String,
+        address: String,
+        contacts: String
+    }]
 });
-
-// register the model globally
 var UserProfile = mongoose.model("UserProfileSchema", UserProfileSchema);
 
 
 var UserSchema = new Schema({
-    uuid:       String,
-    uid:        String,
-    profile:    [UserProfileSchema],
-    perm:       [mordor.UserPermissionSchema],
-    parent:     String
+    uuid:       String,                         // uuid of user for frontend
+    uid:        String,                         // user id
+    profile:    [UserProfileSchema],            // user profile
+    perm:       [mordor.UserPermissionSchema],  // user permissions
+    children:   [String],                       // children of this user
+    teams:      [String],                       // belongs to team
+    org:        String                          // user's organization
 });
-
-UserSchema.index({uid: 1});
-
-/** User Schema methods */
+UserSchema.index({ uid: 1 });
 
 var GOD = null;
 
@@ -59,12 +63,11 @@ UserSchema.methods.Add = function(granter, uid, hash, fn) {
                 if (uid && hash) {
                     that.uuid       =   uuid.v4();
                     that.uid        =   uid;
-                    that.profile    =   new UserProfile({uuid: this.uuid,
-                        uid: this.uid});
+                    that.profile    =   new UserProfile({uuid: this.uuid, uid: this.uid});
                     that.perm       =   new mordor.UserPermission({uuid: this.uuid,
-                        admin: 0,
-                        password: new mordor.Password({user:  this.uuid,
-                            hash: hash})
+                                        admin: 0,
+                                        password: new mordor.Password({user:  this.uuid,
+                                        hash: hash})
                     });
                     that.perm[0].password[0].Change(hash);
 
@@ -73,7 +76,7 @@ UserSchema.methods.Add = function(granter, uid, hash, fn) {
                         // some special stuff, it's god after all!
                         that.perm[0].perm = [mordor.Permission.god];
                         that.perm[0].admin = mordor.Permission.god;
-                        that.parent = null;
+                        that.children = null;
 
                         // email god's password, do not store on server! :O
                         heartbeat.notifyServerPassword(hash, null);
@@ -85,7 +88,10 @@ UserSchema.methods.Add = function(granter, uid, hash, fn) {
                             // check if the granter has permission to add a user (at least mgr)
                             if (!err && (parent != null) &&
                                 (parent.perm[0].admin >= mordor.Permission.mgr)) {
-                                that.parent =  parent.uuid;
+                                that.parent =  parent.uuid; // todo: deprecated
+                                parent.children.push(that.uid);
+                                that.org = parent.org;
+                                that.teams = [];
 
                                 // save the new user onto the DB
                                 that.save(function(err, user) {
@@ -161,6 +167,7 @@ UserSchema.methods.Revoke = function(granter, user, kingdom, perm, fn) {
     });
 };
 
+// promote a user's admin permission
 UserSchema.methods.Promote = function(granter, user, perm, fn) {
     user.perm[0].promote(granter, user, perm, function(err, u) {
         if (err) fn('Could not promote');
@@ -169,26 +176,25 @@ UserSchema.methods.Promote = function(granter, user, perm, fn) {
 };
 
 // reassociate a user to a different parent
-// todo: rewrite
 UserSchema.methods.Reassoc = function(granter, user, newParent, fn) {
     // see if granter has permission to change user's parent
-    findByUuid(user.parent, function(err, p) {
+    mordor.Permission.hasGreaterPermission(granter, p, function(err) {
         if (!err) {
-            // In case of any dangling children, adopt them, like init does (re-assess this strategy)
-            if (!p) p = GOD;
-            mordor.Permission.hasGreaterPermission(granter, p, function(err) {
+            mordor.Permission.hasGreaterPermission(granter, newParent, function(err) {
                 if (!err) {
-                    mordor.Permission.hasGreaterPermission(granter, newParent, function(err) {
-                        if (!err) {
-                            user.parent = newParent.uuid;
-                            fn(null, user);
-                        } else fn('New parent is not qualified', null);
+                    User.findOne({ "children": user.uid }, function(err, prevParent) {
+                        var ctr = 0;
+                        if (!err && prevParent) prevParent.children.forEach(function(c) {
+                            if (c.uid == user.uid) prevParent.children.remove(ctr);
+                            ctr++;
+                        });
+                        else console.log("Previous parent not found?!");
                     });
-                } else fn('Granter does not have permission to re-associate', null);
+                    newParent.children.push(this.uid);
+                    fn(null, user);
+                } else fn('New parent is not qualified', null);
             });
-        } else {
-            fn('Existing parent not found');
-        }
+        } else fn('Granter does not have permission to re-associate', null);
     });
 };
 
@@ -198,6 +204,7 @@ UserSchema.methods.UpdateProfile = function(granter, user, data, fn) {
     fn(null, user);
 };
 
+// change password
 UserSchema.methods.Passwd = function(granter, user, passwd, fn) {
     // now this is a tricky one! - todo: does the user's manager has control?
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
@@ -208,13 +215,42 @@ UserSchema.methods.Passwd = function(granter, user, passwd, fn) {
     });
 };
 
-// update a user's admin status
-UserSchema.methods.Admin = function(granter, user, perm, fn) {
+// add an user to a team
+UserSchema.methods.AddUserToTeam = function(granter, teamName, fn) {
+    var that = this;
+
+    mordor.Permission.hasGreaterPermission(granter, that, function(err) {
+       if (!err) {
+           team.FindOrganization(this.org, function(err, org) {
+               if (!err && org) org.AddUserToTeam(teamName, that, function(err, t) {
+                   if (!err) that.teams.push(t.name);
+                   else fn(err, null);
+               });
+               else fn('Could not find organization', null);
+           });
+       }
+       else fn('Granter does not have sufficient permission', null);
+    });
+};
+
+// remove an user from a team
+UserSchema.methods.RemoveUserFromTeam = function(granter, teamName, fn) {
+    var that = this;
+
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
-            user.perm[0].updateAdmin(granter, perm);
-            fn(false, user);
-        } else fn('Granter does not have permission to update admin', null);
+            team.FindOrganization(this.org, function(err, org) {
+                if (!err && org) org.RemoveUserFromTeam(teamName, that, function(err, t) {
+                    if(!err && t) that.teams.forEach(function(tname) {
+                        if (tname == team.name) that.users.remove(ctr);
+                        ctr++;
+                    });
+                    else fn(err, null);
+                });
+                else fn('Could not find organization', null);
+            });
+        }
+        else fn('Granter does not have sufficient permission', null);
     });
 };
 
@@ -222,19 +258,15 @@ UserSchema.methods.Admin = function(granter, user, perm, fn) {
 var User = mongoose.model("UserSchema", UserSchema);
 User.ensureIndexes(function(err){ if (err) console.log('ensureIndexes failed')});
 
-/**
- * Kingdom Management structures
- */
+////////////////////////////////
+//   Kingdoms
+////////////////////////////////
 
 var KingdomSchema = new Schema({
     name:       String,
     perm:       [mordor.KingdomPermissionSchema],
     pkg:        []
 });
-
-/**
- * The Kingdom Management functions
- */
 
 // static local array for storing all kingdoms - todo: commit to DB?
 var Kingdoms = [];
@@ -280,7 +312,9 @@ exports.findKingdomByUrl = function(name, fn) {
 var Kingdom = mongoose.model("KingdomSchema", KingdomSchema);
 exports.Kingdom = Kingdom;
 
-/** APIs exposed */
+////////////////////////////////
+//   Utilities
+////////////////////////////////
 
 var result = function(type, msg, outcome){
     this.type = type;
@@ -289,7 +323,6 @@ var result = function(type, msg, outcome){
 };
 
 var parentApp = null;
-
 
 var sendException = function(e, recovery) {
     // throw all exceptions in a dev environment
@@ -312,6 +345,9 @@ var sendException = function(e, recovery) {
     console.log("Exception occured while processing request");
 };
 
+////////////////////////////////
+//   JSON Request Servers
+////////////////////////////////
 AddUser = function(reqJSON, granter, res) {
     var u = new User({});
 
@@ -324,7 +360,6 @@ AddUser = function(reqJSON, granter, res) {
                     'User ' + reqJSON.username + ' created', true));
         });
 };
-
 
 DeleteUser = function(reqJSON, granter, res) {
     exports.findByUsername(reqJSON.username, function(err, u) {
@@ -570,6 +605,7 @@ EntityTree = function (app) {
 
 exports.Setup = EntityTree;
 
+// Deprecated, do not use this
 var findByUuid = function(u, fn) {
     // god cannot be found by uuid! :D
     return User.findOne({ uuid: u }, fn);
@@ -582,6 +618,7 @@ var findByUsername = function(u, fn) {
 };
 exports.findByUsername = findByUsername;
 
+// createOrganizaion
 
 // som eof the functions that might be useful when the GUI is up
 //ListAllUsersWithThisParent(granter)
