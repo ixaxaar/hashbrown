@@ -48,6 +48,9 @@ ConnectionMgr.prototype.clearConnection = function(connectionString){
 
 var ConnMgr = new ConnectionMgr();
 
+// this can be called from anywhere
+exports.GetConnection = ConnMgr.getConnection;
+
 ////////////////////////////////
 //   Team Schema
 ////////////////////////////////
@@ -129,7 +132,11 @@ TeamSchema.methods.GetConnection = function() {
 
 TeamSchema.methods.AddUser = function(user, fn) {
     this.users.push(user.uid);
-    fn(null, this);
+    var entity = require('./entity');
+    entity.AddtoTeam(user, this.connection, function(err) {
+        if (!err) fn(null, this);
+        else fn('Could not add team to user');
+    });
 };
 
 TeamSchema.methods.RemoveUser = function(user, fn) {
@@ -137,10 +144,18 @@ TeamSchema.methods.RemoveUser = function(user, fn) {
     var that = this;
 
     this.users.forEach(function(u) {
-        if (u == user.uid) that.users.remove(ctr);
+        if (u == user.uid) {
+            var entity = require('./entity');
+
+            that.users.remove(ctr);
+            entity.RemoveFromTeam(user, this.connection, function(err) {
+                if (!err) fn(null, this);
+                else fn('Could not add team to user');
+            });
+        }
         ctr++;
     });
-    fn(null, this);
+    // note: point of inconsistence, callback might not necessarily be called
 };
 
 
@@ -226,10 +241,6 @@ OrganizationSchema.methods.Destroy = function() {
     this.delete(fn);
 };
 
-OrganizationSchema.methods.GetConnection = function() {
-    return ConnMgr.getConnection(this.connectionString);
-};
-
 OrganizationSchema.methods.AddUserToTeam = function(teamName, user, fn) {
     var conn = ConnMgr.getConnection(this.connectionString);
     var Team = conn.goose.model("TeamSchema", TeamSchema);
@@ -269,8 +280,8 @@ var WinterfellSchema = new Schema({
 });
 var Winterfell = mongoose.model("WinterfellSchema", WinterfellSchema);
 
-var findOrganization = function(json, fn) {
-    return Organization.findOne({ name: json.name }, fn);
+var findOrganization = function(name, fn) {
+    return Organization.findOne({ name: name }, fn);
 };
 
 ////////////////////////////////
@@ -285,12 +296,12 @@ var verify = function(user, entity, fn) {
     // P.S. team owners have to be specified manually after team's creation
     if ((mordor.Permission.hasAdminPermission(user, mordor.Permission.mgr)) &&
         (entity.owner == user))
-            fn(true);
+        fn(true);
 
     // org and higher accounts can make changes if their organizations are the same
     else if ((mordor.Permission.hasAdminPermission(user, mordor.Permission.org))
         && (user.org == entity.orgName))
-            fn(true);
+        fn(true);
 
     // NOTE: this has an interesting side-effect:
     // only org-level users can create an org-level team
@@ -303,39 +314,14 @@ var verify = function(user, entity, fn) {
 
 
 ////////////////////////////////
-//   Winterfell Constructor
-////////////////////////////////
-
-var ConnectAll = function() {
-    // connect everything we know of
-    Organization.find({}, function(err, o) {
-        // connect all organizations and their teams
-        if (!err) {
-            o.forEach(function(org) {
-                org.Connect(function() { console.log('Could not connect organization') });
-            });
-        }
-    })
-};
-exports.Init = ConnectAll;
-
-var teamServer = function(req, res, next) {
-
-};
-
-var orgServer = function(req, res, next) {
-
-};
-
-var Router = function(app) {
-    app.post('/team', teamServer);
-    app.post('/organization', orgServer);
-};
-exports.Configure = Router;
-
-////////////////////////////////
 //   JSON Request Servers
 ////////////////////////////////
+
+var result = function(type, msg, outcome){
+    this.type = type;
+    this.success =  (outcome ? true : false);
+    this.msg = msg;
+};
 
 /**
  * json request structure:
@@ -346,6 +332,7 @@ exports.Configure = Router;
  * }
  */
 var CreateOrganization = function(user, json, fn) {
+    if (user.uid == god)
     Organization.findOne({ name: json.name }, function(err, o) {
         if (!o) {
             var org = new Organization({});
@@ -356,6 +343,7 @@ var CreateOrganization = function(user, json, fn) {
         } else if (err) fn(err, null);
         else fn('Organization alrady exists', null);
     });
+    else fn('No you dont!');
 };
 
 /**
@@ -371,8 +359,92 @@ var CreateOrganization = function(user, json, fn) {
 var CreateTeam = function(user, json, fn) {
     Organization.findOne({ name: json.name }, function(err, o) {
         if (!err && o) {
-            org.CreateTeam(user, json.name,
-                json.dbConnection, json.dbName, json.parent, o, fn);
+            verify(user, org, function(err) {
+                if (!err) {
+                    org.CreateTeam(user, json.name,
+                        json.dbConnection, json.dbName, json.parent, o, fn);
+                }
+                else fn('User does not have permission to do that');
+            });
         } else fn('No such organization exists');
     });
 };
+
+/**
+ * json request structure:
+ * {
+ *  org: String,
+ *  team: String,
+ *  user: String
+ * }
+ */
+var AddUser = function(user, json, fn) {
+    if (json.team && json.organization) {
+        findOrganization(json.organization, function(err, org) {
+            if (!err && org) {
+                verify(user, org, function(err) {
+                    if (!err) {
+                        org.AddUserToTeam(json.team, user, function(err, t) {
+                            if (!err) fn(null);
+                            else fn(err);
+                        });
+                    }
+                    else fn('User does not have permission to do that');
+                });
+            }
+            else fn('Could not find organization');
+        });
+    }
+    else fn('Parameters missing');
+};
+
+/**
+ * JSON structure:
+ * {
+ *  request: String,
+ *  body: {}
+ * }
+ *
+ */
+var teamServer = function(req, res, next) {
+    req.accepts('application/json');
+
+    if (req.body) switch(req.body.request) {
+        case 'adduser':
+            AddUser(req.user, req.body.body, function(err) {
+                res.send(new result(req.request, err, (err ? false : true)));
+            });
+            break;
+        default:
+            res.send(new result(req.request, 'Invalid request', false));
+            break;
+    }
+};
+
+var orgServer = function(req, res, next) {
+
+};
+
+////////////////////////////////
+//   Winterfell Constructor
+////////////////////////////////
+
+var ConnectAll = function(app) {
+    // set up the routes
+    app.post('/team', teamServer);
+    app.post('/organization', orgServer);
+
+    // connect everything we know of
+    Organization.find({}, function(err, o) {
+        // connect all organizations and their teams
+        if (!err) {
+            o.forEach(function(org) {
+                org.Connect(function() { console.log('Could not connect organization') });
+            });
+        }
+    })
+};
+exports.Init = ConnectAll;
+
+
+

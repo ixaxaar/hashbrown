@@ -221,13 +221,7 @@ UserSchema.methods.AddUserToTeam = function(granter, teamName, fn) {
 
     mordor.Permission.hasGreaterPermission(granter, that, function(err) {
        if (!err) {
-           team.FindOrganization(this.org, function(err, org) {
-               if (!err && org) org.AddUserToTeam(teamName, that, function(err, t) {
-                   if (!err) that.teams.push(t.name);
-                   else fn(err, null);
-               });
-               else fn('Could not find organization', null);
-           });
+           that.teams.push(t.name);
        }
        else fn('Granter does not have sufficient permission', null);
     });
@@ -239,15 +233,9 @@ UserSchema.methods.RemoveUserFromTeam = function(granter, teamName, fn) {
 
     mordor.Permission.hasGreaterPermission(granter, user, function(err) {
         if (!err) {
-            team.FindOrganization(this.org, function(err, org) {
-                if (!err && org) org.RemoveUserFromTeam(teamName, that, function(err, t) {
-                    if(!err && t) that.teams.forEach(function(tname) {
-                        if (tname == team.name) that.users.remove(ctr);
-                        ctr++;
-                    });
-                    else fn(err, null);
-                });
-                else fn('Could not find organization', null);
+            that.teams.forEach(function(tname) {
+                if (tname == team.name) that.users.remove(ctr);
+                ctr++;
             });
         }
         else fn('Granter does not have sufficient permission', null);
@@ -524,6 +512,14 @@ Reassociate = function(reqJSON, granter, res) {
                 else res.send(new result('Reassociate', 'No such user exists', false));
             });
     });
+};
+
+exports.AddtoTeam = function(user, teamName, fn) {
+    user.AddUserToTeam(user, teamName, fn);
+};
+
+exports.RemoveFromTeam = function(user, teamName, fn) {
+    user.RemoveUserFromTeam(suer, teamName, fn);
 };
 
 var requestRouter = function(req, res, next) {
