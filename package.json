@@ -18,7 +18,8 @@
     "mongoose": "*",
     "memcached": "*",
     "jade": "*",
-    "marked": "*"
+    "marked": "*",
+    "jsonschema": "*"
   },
   "devDependencies": {
     "nodemon": "*"

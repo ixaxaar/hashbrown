@@ -76,6 +76,7 @@ UserSchema.methods.Add = function(granter, uid, hash, fn) {
                         // some special stuff, it's god after all!
                         that.perm[0].perm = [mordor.Permission.god];
                         that.perm[0].admin = mordor.Permission.god;
+                        that.org = 'God';
                         that.children = null;
 
                         // email god's password, do not store on server! :O
@@ -336,6 +337,29 @@ var sendException = function(e, recovery) {
 ////////////////////////////////
 //   JSON Request Servers
 ////////////////////////////////
+
+exports.addOrgUser = function(granter, name, orgName, pass, kingdoms, fn) {
+    var newOrgUser = new User({});
+    newOrgUser.Add(granter, name, pass, function(err, org) {
+        if (!err && org) {
+            // assign it an org
+            org.org = orgName;
+            // assign it org admin permission
+            org.Promote(granter, org, mordor.Permission.org, function(err, orgp) {
+                if (!err && org) {
+                    // assign it org permission for every subscribed kingdom
+                    kingdoms.forEach(function(k) {
+                        orgp.Grant(granter, orgp, k, mordor.Permission.org, function(err) {
+                            if (err) fn(err);
+                            else fn(null);
+                        });
+                    });
+                }
+            });
+        }
+    });
+}
+
 AddUser = function(reqJSON, granter, res) {
     var u = new User({});
 

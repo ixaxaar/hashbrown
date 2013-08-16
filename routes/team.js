@@ -15,6 +15,10 @@ var memcached = require('memcached');
 
 var uuid = require('node-uuid');
 
+// json schema validation - for request jsons
+var Validator = require('jsonschema').Validator;
+var v = new Validator();
+
 // the local database storing organization schemas
 var settingsdb = 'mongodb://localhost/winterfell';
 
@@ -210,7 +214,10 @@ OrganizationSchema.methods.Create = function(user, name, dbConnection, dbName, f
     (user) ? this.owner = user.uid : ret = 'user is missing';
     (dbConnection) ? this.dbConnection = dbConnection : ret = 'dbConnection missing';
     (dbName) ? this.dbName = dbName :  ret = 'dbName missing';
-    if (ret) this.save(fn);
+    if (!ret) this.save(function(err, newo) {
+        if (!err) { fn(null, newo); }
+        else fn(err.message);
+    });
     else fn(ret, null);
 };
 
@@ -246,6 +253,7 @@ OrganizationSchema.methods.AddUserToTeam = function(teamName, user, fn) {
     var Team = conn.goose.model("TeamSchema", TeamSchema);
 
     if (conn) Team.findOne( {name: teamName}, function(err, t) {
+        if (user.d)
         if (!err && t) t.AddUser(user, fn);
         else fn('No such team exists', null);
     });
@@ -268,20 +276,6 @@ Organization.ensureIndexes( function(err) { if (err) consolelog("ensureInedxes f
 
 exports.FindOrganization = function(name, fn) {
     Organization.findOne({"name": name }, fn);
-};
-
-////////////////////////////////
-//   Winterfell Schema
-////////////////////////////////
-
-var WinterfellSchema = new Schema({
-    local: { type: String, default: settingsdb },
-    orgs: [OrganizationSchema]
-});
-var Winterfell = mongoose.model("WinterfellSchema", WinterfellSchema);
-
-var findOrganization = function(name, fn) {
-    return Organization.findOne({ name: name }, fn);
 };
 
 ////////////////////////////////
@@ -317,7 +311,8 @@ var verify = function(user, entity, fn) {
 //   JSON Request Servers
 ////////////////////////////////
 
-var result = function(type, msg, outcome){
+var result = function(uuid, type, msg, outcome){
+    this.uuid = uuid;
     this.type = type;
     this.success =  (outcome ? true : false);
     this.msg = msg;
@@ -398,9 +393,74 @@ var AddUser = function(user, json, fn) {
     else fn('Parameters missing');
 };
 
+
+
+/**
+ * JSON body structure:
+ * Input
+ * {
+ *  name: String,
+ *  dbConnection: String,
+ *  dbName: String,
+ *  hash: String,
+ *  kingdoms: [String]
+ * }
+ *
+ * Output:
+ * {
+ *  orguuid: String,
+ *  useruuid: String
+ * }
+ *
+ */
+
+var GodCreatesAnOrgSchema  = {
+    "id": "/GodCreatesAnOrgSchema",
+    "type": "object",
+    "properties": {
+        "name": string,
+        "dbConnection": { "type": string },
+        "dbname": { "type": string },
+        "hash": { "type": string },
+        "kingdoms": {
+            "type": "array",
+            "items": {"type": "string"}
+        }
+    }
+};
+v.addSchema(GodCreatesAnOrgSchema, '/GodCreatesAnOrgSchema');
+
+var GodCreatesAnOrg = function(user, json, fn) {
+    if (v.validate(json, GodCreatesAnOrgSchema)) {
+        if (user.uid == 'god') {
+            var org = new Organization();
+
+            // create an organization an user and bind the user to that organization
+            org.Create(user, json.name, json.dbConnection, json.dbName, function(err, newo) {
+                if (!err && newo) {
+                    var entity = require('./entity');
+                    entity.addOrgUser(user, json.name, newo.connectionString, json.hash, json.kingdoms, function(err, newu) {
+                        if (!err) {
+                            var response = {
+                                "orguuid" : newo.uuid,
+                                "useruuid" : newu.uuid
+                            };
+                            fn(null, response);
+                        }
+                        else fn(err, null);
+                    });
+                }
+                else fn('Could not create user org');
+            });
+        }
+        else fn('thou shalt not be god!');
+    } else fn('Request format is wrong');
+};
+
 /**
  * JSON structure:
  * {
+ *  uuid: String,
  *  request: String,
  *  body: {}
  * }
@@ -415,6 +475,19 @@ var teamServer = function(req, res, next) {
                 res.send(new result(req.request, err, (err ? false : true)));
             });
             break;
+
+        case 'removeuser':
+            DelUser(req.user, req.body.body, function(err) {
+                res.send(new result(req.request, err, (err ? false : true)));
+            });
+            break;
+
+        case 'getallusers':
+            GetAllUsers(req.user, req.body.body, function(err) {
+                res.send(new result(req.request, err, (err ? false : true)));
+            });
+            break;
+
         default:
             res.send(new result(req.request, 'Invalid request', false));
             break;
@@ -422,7 +495,37 @@ var teamServer = function(req, res, next) {
 };
 
 var orgServer = function(req, res, next) {
+    req.accepts('application/json');
 
+    if (req.body) switch(req.body.request) {
+        case 'addteam':
+            CreateTeam(req.user, req.body.body, function(err) {
+                res.send(new result(req.uuid, req.request, err, (err ? false : true)));
+            });
+            break;
+
+        case 'removeteam':
+            DelTeam(req.user, req.body.body, function(err) {
+                res.send(new result(req.uuid, req.request, err, (err ? false : true)));
+            });
+            break;
+
+        case 'createorg':
+            GodCreatesAnOrg(req.user, req.body.body, function(err) {
+                res.send(new result(req.uuid, req.request, err, (err ? false : true)));
+            });
+            break;
+
+        case 'removeorg':
+            GodDestroysAnOrg(req.user, req.body.body, function(err) {
+                res.send(new result(req.uuid, req.request, err, (err ? false : true)));
+            });
+            break;
+            
+        default:
+            res.send(new result(req.uuid, req.request, 'Invalid request', false));
+            break;
+    }
 };
 
 ////////////////////////////////
