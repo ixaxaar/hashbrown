@@ -14,6 +14,7 @@ var express = require('express')
     , http = require('http')
     , path = require('path')
     , entity = require('./routes/entity')
+    , team = require('./routes/team')
     , passport = require('passport')
     , heartbeat = require('./routes/heartbeat')
     , mordor = require("./routes/ODNSWIM");
@@ -93,6 +94,8 @@ app.get('/settings', mordor.openBlackGate, minas.ithil);
 
 // setup the settings backend handler
 entity.Setup(app);
+
+team.Init(app);
 
 // initialize all APIs here
 

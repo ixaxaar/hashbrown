@@ -12,7 +12,7 @@ var mongoose = require('mongoose')
     , ObjectId = Schema.ObjectId;
 
 var memcached = require('memcached');
-
+var path = require('path');
 var uuid = require('node-uuid');
 
 // json schema validation - for request jsons
@@ -70,16 +70,18 @@ var TeamSchema = new Schema({
     children: [String]
 });
 TeamSchema.index({ name: 1 , orgName: 1 });
+TeamSchema.index({ children: 1 }); //index separately as search by children is independent
 
 TeamSchema.virtual('connectionString')
     .get(function () {
         return (this.dbConnection + '/' + this.dbName);
     });
 
-TeamSchema.methods.CreateTeam = function (user, name, dbConnection, dbName, parent, org, fn) {
+TeamSchema.methods.CreateTeam = function (conn, user, name, dbConnection, dbName, parent, org, fn) {
     var that = this;
+    var Team = conn.model("TeamSchema", TeamSchema);
 
-    team.findOne({ "name": name }, function(err, t) {
+    this.model("TeamSchema").findOne({ "name": name }, function(err, t) {
         if (!t) {
             var ret = null;
             name ? that.name = name : ret = 'name missing';
@@ -90,20 +92,32 @@ TeamSchema.methods.CreateTeam = function (user, name, dbConnection, dbName, pare
 
             // add the tree references
             if (parent) {
-                if (!this.findOne({ "name": parent }, function(err, p) {
-                    if (!err && p) return !!p.children.push(name);
-                    else return false;
+                if (!that.model("TeamSchema").findOne({ "name": parent },
+                    function(err, p) {
+                        if (!err && p) {
+                            p.children.push(name);
+                            return p.save(function(err) {
+                                if (err) return true;
+                                else return false;
+                            })
+                        }
+                        else return false;
                 })) {
                     ret = 'Could not find parent';
                 }
             }
-
-            if (ret) that.save(function(err, st) {
-                if (!err && st) fn(null, st);
+            console.log(that)
+            if (!ret) that.save(function(err, st) {
+                if (!err && st) {
+                    fn(null, st);
+                }
                 else fn('Could not save team', null);
             });
             else fn(ret, null);
-        } else fn('Team by the same name already exists', null);
+        } else {
+            console.log(err);
+            fn('Team by the same name already exists', null);
+        }
     });
 };
 
@@ -137,9 +151,13 @@ TeamSchema.methods.GetConnection = function() {
 TeamSchema.methods.AddUser = function(user, fn) {
     this.users.push(user.uid);
     var entity = require('./entity');
-    entity.AddtoTeam(user, this.connection, function(err) {
-        if (!err) fn(null, this);
-        else fn('Could not add team to user');
+
+    var that = this;
+    entity.AddtoTeam(user, this.connectionString, function(err) {
+        that.save(function(err, sthat) {
+            if (!err) fn(null, sthat);
+            else fn('Could not add team to user');
+        });
     });
 };
 
@@ -173,13 +191,14 @@ var OrganizationSchema = new Schema({
     name: String,
     dbConnection: String,
     dbName: { type: String, default: uuid.v4() },
-    teams: [String]
+    teams: [String],
+    rootNodes: [string] // specifically for tree searching
 });
 OrganizationSchema.index({ name: 1 });
 
 OrganizationSchema.virtual('connectionString')
     .get(function () {
-        return (this.dbConnection + '/' + this.dbName);
+        return (this.dbConnection + this.dbName);
     });
 
 // locally this structure maintains the
@@ -190,6 +209,7 @@ var connections = [];
 OrganizationSchema.methods.Connect = function(fn) {
     // create a connection to this organization's database
     if (this.connectionString && !ConnMgr.getConnection(this.connectionString)) {
+        console.log(this.connectionString)
         var conn = mongoose.createConnection(this.connectionString);
         // save the connection instance
         ConnMgr.setConnection(conn, this.connectionString);
@@ -209,32 +229,47 @@ OrganizationSchema.methods.Disconnect = function(fn) {
 };
 
 OrganizationSchema.methods.Create = function(user, name, dbConnection, dbName, fn) {
-    var ret = null;
-    (name) ? this.name = name : ret = 'name missing';
-    (user) ? this.owner = user.uid : ret = 'user is missing';
-    (dbConnection) ? this.dbConnection = dbConnection : ret = 'dbConnection missing';
-    (dbName) ? this.dbName = dbName :  ret = 'dbName missing';
-    if (!ret) this.save(function(err, newo) {
-        if (!err) { fn(null, newo); }
-        else fn(err.message);
+    var that = this;
+
+    Organization.findOne( {name: name}, function(err, org) {
+        if (!org) {
+            var ret = null;
+            (name) ? that.name = name : ret = 'name missing';
+            (user) ? that.owner = name : ret = 'user is missing';
+            (dbConnection) ? that.dbConnection = dbConnection : ret = 'dbConnection missing';
+            (dbName) ? that.dbName = dbName :  ret = 'dbName missing';
+            if (!ret) that.save(function(err, newo) {
+                if (!err) { fn(null, newo); }
+                else fn(err.message);
+            });
+            else fn(ret, null);
+        }
+        else fn('Organization exists');
     });
-    else fn(ret, null);
 };
 
-OrganizationSchema.methods.CreateTeam = function(name, dbConnection, dbName, parent, fn) {
-    var conn = this.connection;
+OrganizationSchema.methods.CreateTeam = function(user, name, dbConnection, dbName, parent, fn) {
+    var conn = ConnMgr.getConnection(this.connectionString);
+    var that = this;
     if (conn) {
         // get a mongoose model instance corresponding
         // to this organization's connection
-        var Team = conn.goose.model("TeamSchema", TeamSchema);
+        var Team = conn.model("TeamSchema", TeamSchema);
 
         // create a new team structure
         var team = new Team({});
-        t.CreateTeam(name, dbConnection, dbName, parent, this, function(err, t) {
-            if (!err && conn) {
-                this.teams.push(t.name);
+        team.CreateTeam(conn, user, name, dbConnection, dbName, parent, this, function(err, t) {
+            if (!err && t) {
+                that.teams.push(t.name);
+                // no parent specified, this team qualifies as a root node
+                if (!parent) this.rootNodes.push(t.name);
                 // connect to the team's database
-                t.Connect(fn);
+                t.Connect(function(err) {
+                    // now the org's data can be updated
+                    that.save(function (err) { if (err) fn(err.message);
+                                                        else fn(null, t); });
+                    if (err) console.log("Could not connect, probably same DB");
+                });
             }
             else fn(err, null);
         });
@@ -271,8 +306,78 @@ OrganizationSchema.methods.RemoveUserFromTeam = function(teamName, user, fn) {
     else fn('Could not get database connection', null);
 };
 
+OrganizationSchema.methods.FindTeam = function(teamName, fn) {
+    var conn = ConnMgr.getConnection(this.connectionString);
+    var Team = conn.goose.model("TeamSchema", TeamSchema);
+
+    if (conn) Team.findOne( {name: teamName}, function(err, t){
+        if (!err && t) fn(null, t);
+        else fn('Team not found', null);
+    });
+};
+
+////////////////////////
+// Tree Creator
+////////////////////////
+
+var node = function(name) {
+    this.name =  name;
+    this.children = {};
+};
+
+// todo: re-check this when sane
+var recurseTree = function(conn, tree, root, fn) {
+    root.children.forEach(function(c) {
+        conn.findOne({ name: c }, function(err, child) {
+            // the third criteria is to detect and avoid recursive associations
+            if (!err && child && !child.children[root.name]) {
+                var childNode = new node(child.name);
+                if (child.children.length) recurseTree(conn, childNode, child);
+                tree.children.push(childNode);
+            }
+        });
+    });
+    fn(tree);
+};
+
+OrganizationSchema.methods.TeamTree = function(fn) {
+    var response = {};
+
+    // get this org's database connection
+    var conn = ConnMgr.getConnection(this.connectionString);
+    var Team = conn.goose.model("TeamSchema", TeamSchema);
+
+    var error = null;
+
+    var rootNode = new node({});
+
+    if (conn) {
+        // create the org node
+        root.name = this.name;
+
+        // for each root node, find its children
+        this.rootNodes.forEach(function(r) {
+            Team.findOne({ name: r }, function(err, root) {
+                if (!err && root) {
+                    // add all the root nodes
+                    rootNode.children.push(new node({ name: root.name }));
+                    var thisTree = rootNode.children;
+                    recurseTree(Team, thisTree, root, function(tree) {
+                        if (!tree) error = true;
+                    });
+                }
+                else console.log('Could not find team, database might need cleaning');
+            });
+        });
+    }
+
+    if (!error) fn(null, rootNode);
+    else fn('Error occured while constructing tree');
+};
+
+
 var Organization = mongoose.model("OrganizationSchema", OrganizationSchema);
-Organization.ensureIndexes( function(err) { if (err) consolelog("ensureInedxes failed") } );
+Organization.ensureIndexes( function(err) { if (err) console.log("ensureInedxes failed") } );
 
 exports.FindOrganization = function(name, fn) {
     Organization.findOne({"name": name }, fn);
@@ -311,6 +416,17 @@ var verify = function(user, entity, fn) {
 //   JSON Request Servers
 ////////////////////////////////
 
+/**
+ * JSON body structure:
+ * Input
+ * {
+ *  uuid: String,
+ *  type: String,
+ *  success: Boolean,
+ *  msg: {}
+ * }
+ *
+ */
 var result = function(uuid, type, msg, outcome){
     this.uuid = uuid;
     this.type = type;
@@ -319,81 +435,109 @@ var result = function(uuid, type, msg, outcome){
 };
 
 /**
- * json request structure:
- * {
- *  name: String,
- *  dbName: String,
- *  dbConnection: String,
- * }
- */
-var CreateOrganization = function(user, json, fn) {
-    if (user.uid == god)
-    Organization.findOne({ name: json.name }, function(err, o) {
-        if (!o) {
-            var org = new Organization({});
-            org.Create(user, json.name, json.dbConnection, json.dbName, function(err, o) {
-                if (!err && o) org.Connect(fn);
-                else fn('Could not create organization', null);
-            });
-        } else if (err) fn(err, null);
-        else fn('Organization alrady exists', null);
-    });
-    else fn('No you dont!');
-};
-
-/**
- * json request structure:
+ * json body structure:
+ * Input:
  * {
  *  org: String,
  *  parent: String,
  *  name: String,
  *  dbName: String,
- *  dbConnection: String,
+ *  dbConnection: String
  * }
- */
-var CreateTeam = function(user, json, fn) {
-    Organization.findOne({ name: json.name }, function(err, o) {
-        if (!err && o) {
-            verify(user, org, function(err) {
-                if (!err) {
-                    org.CreateTeam(user, json.name,
-                        json.dbConnection, json.dbName, json.parent, o, fn);
-                }
-                else fn('User does not have permission to do that');
-            });
-        } else fn('No such organization exists');
-    });
-};
-
-/**
- * json request structure:
+ *
+ * Output:
  * {
- *  org: String,
- *  team: String,
- *  user: String
+ *  useruuid: String
+ *  teamname: String,
+ *  teamuuid: String
  * }
+ *
  */
-var AddUser = function(user, json, fn) {
-    if (json.team && json.organization) {
-        findOrganization(json.organization, function(err, org) {
+var createTeamSchema = {
+    "id": "/createTeamSchema",
+    "type": "object",
+    "properties": {
+        "org": { "type": "string" },
+        "parent": { "type": "string" },
+        "name": { "type": "string" },
+        "dbName": { "type": "string" },
+        "dbConnection": { "type": "string" }
+    }
+};
+v.addSchema(createTeamSchema, '/createTeamSchema');
+
+var CreateTeam = function(user, json, fn) {
+    if (!v.validate(json, createTeamSchema).errors.length) {
+        Organization.findOne({ name: json.org }, function(err, org) {
             if (!err && org) {
                 verify(user, org, function(err) {
                     if (!err) {
-                        org.AddUserToTeam(json.team, user, function(err, t) {
-                            if (!err) fn(null);
-                            else fn(err);
-                        });
+                        org.CreateTeam(user, json.name,
+                            json.dbConnection, json.dbName, json.parent, function(err, team) {
+                                if (!err && team) {
+                                    var response = {
+                                        "useruuid": user.uuid,
+                                        "teamname": team.name,
+                                        "teamuuid": team.uuid
+                                    };
+                                    fn(null, response);
+                                }
+                                else fn(err);
+                            });
                     }
                     else fn('User does not have permission to do that');
+                });
+            } else fn('No such organization exists');
+        });
+    }
+    else fn('Request format is wrong');
+};
+
+
+/**
+ * json body structure:
+ * Input:
+ * {
+ *  name: String,
+ *  team: String
+ * }
+ *
+ * Output:
+ * {
+ *  useruuid: String
+ * }
+ *
+ */
+var addUserSchema = {
+    "id": "/addUserSchema",
+    "type": "object",
+    "properties": {
+        "name": String,
+        "team": String
+    }
+};
+
+var AddUser = function(granter, json, fn) {
+    if (!v.validate(json, addUserSchema).errors.length) {
+        findOrganization(granter.org, function(err, org) {
+            if (!err && org) {
+                org.FindTeam(json.team, function(err, t) {
+                    verify(granter, t, function(err) {
+                        if (!err) {
+                            org.AddUserToTeam(json.team, json.name, function(err, u) {
+                                if (!err) fn(null, { useruuid: u.uuid });
+                                else fn(err, null);
+                            });
+                        }
+                        else fn('User does not have permission to do that');
+                    });
                 });
             }
             else fn('Could not find organization');
         });
     }
-    else fn('Parameters missing');
+    else fn('Request format is wrong');
 };
-
-
 
 /**
  * JSON body structure:
@@ -408,30 +552,29 @@ var AddUser = function(user, json, fn) {
  *
  * Output:
  * {
- *  orguuid: String,
  *  useruuid: String
  * }
  *
  */
 
-var GodCreatesAnOrgSchema  = {
-    "id": "/GodCreatesAnOrgSchema",
+var godCreatesAnOrgSchema  = {
+    "id": "/godCreatesAnOrgSchema",
     "type": "object",
     "properties": {
-        "name": string,
-        "dbConnection": { "type": string },
-        "dbname": { "type": string },
-        "hash": { "type": string },
+        "name": { "type": "string", "required": true },
+        "dbConnection": { "type": "string", "required": true },
+        "dbName": { "type": "string", "required": true },
+        "hash": { "type": "string", "required": true },
         "kingdoms": {
             "type": "array",
-            "items": {"type": "string"}
+            "items": { "type": "string" }
         }
     }
 };
-v.addSchema(GodCreatesAnOrgSchema, '/GodCreatesAnOrgSchema');
+v.addSchema(godCreatesAnOrgSchema, '/godCreatesAnOrgSchema');
 
 var GodCreatesAnOrg = function(user, json, fn) {
-    if (v.validate(json, GodCreatesAnOrgSchema)) {
+    if (!v.validate(json, godCreatesAnOrgSchema).errors.length) {
         if (user.uid == 'god') {
             var org = new Organization();
 
@@ -439,10 +582,10 @@ var GodCreatesAnOrg = function(user, json, fn) {
             org.Create(user, json.name, json.dbConnection, json.dbName, function(err, newo) {
                 if (!err && newo) {
                     var entity = require('./entity');
-                    entity.addOrgUser(user, json.name, newo.connectionString, json.hash, json.kingdoms, function(err, newu) {
-                        if (!err) {
+                    entity.addOrgUser(user, json.name, newo.connectionString,
+                        json.hash, json.kingdoms, function(err, newu) {
+                        if (!err && newu) {
                             var response = {
-                                "orguuid" : newo.uuid,
                                 "useruuid" : newu.uuid
                             };
                             fn(null, response);
@@ -450,12 +593,28 @@ var GodCreatesAnOrg = function(user, json, fn) {
                         else fn(err, null);
                     });
                 }
-                else fn('Could not create user org');
+                else fn(err);
             });
         }
         else fn('thou shalt not be god!');
     } else fn('Request format is wrong');
 };
+
+/**
+ * JSON body structure:
+ * Input
+ * {
+ *  name: String,
+ *  dbConnection: String
+ * }
+ *
+ * Output:
+ * {
+ *  orguuid: String,
+ *  useruuid: String
+ * }
+ *
+ */
 
 /**
  * JSON structure:
@@ -471,8 +630,10 @@ var teamServer = function(req, res, next) {
 
     if (req.body) switch(req.body.request) {
         case 'adduser':
-            AddUser(req.user, req.body.body, function(err) {
-                res.send(new result(req.request, err, (err ? false : true)));
+            AddUser(req.user, req.body.body, function(err, response) {
+                res.send(new result(req.body.uuid, req.body.request,
+                    (response ? response : err),
+                    (err ? false : true)));
             });
             break;
 
@@ -499,31 +660,40 @@ var orgServer = function(req, res, next) {
 
     if (req.body) switch(req.body.request) {
         case 'addteam':
-            CreateTeam(req.user, req.body.body, function(err) {
-                res.send(new result(req.uuid, req.request, err, (err ? false : true)));
+            CreateTeam(req.user, req.body.body, function(err, response) {
+                res.send(new result(req.body.uuid, req.body.request,
+                    (response ? response : err),
+                    (err ? false : true)));
             });
             break;
 
         case 'removeteam':
-            DelTeam(req.user, req.body.body, function(err) {
-                res.send(new result(req.uuid, req.request, err, (err ? false : true)));
+            DelTeam(req.user, req.body.body, function(err, response) {
+                res.send(new result(req.body.uuid, req.body.request,
+                    err,
+                    (response ? response : err),
+                    (err ? false : true)));
             });
             break;
 
         case 'createorg':
-            GodCreatesAnOrg(req.user, req.body.body, function(err) {
-                res.send(new result(req.uuid, req.request, err, (err ? false : true)));
+            GodCreatesAnOrg(req.user, req.body.body, function(err, response) {
+                res.send(new result(req.body.uuid, req.body.request,
+                    (response ? response : err),
+                    (err ? false : true)));
             });
             break;
 
         case 'removeorg':
-            GodDestroysAnOrg(req.user, req.body.body, function(err) {
-                res.send(new result(req.uuid, req.request, err, (err ? false : true)));
+            GodDestroysAnOrg(req.user, req.body.body, function(err, response) {
+                res.send(new result(req.body.uuid, req.body.request,
+                    (response ? response : err),
+                    (err ? false : true)));
             });
             break;
             
         default:
-            res.send(new result(req.uuid, req.request, 'Invalid request', false));
+            res.send(new result(req.body.uuid, req.body.request, 'Invalid request', false));
             break;
     }
 };
@@ -538,11 +708,12 @@ var ConnectAll = function(app) {
     app.post('/organization', orgServer);
 
     // connect everything we know of
-    Organization.find({}, function(err, o) {
+    Organization.find({}, function(err, orgs) {
         // connect all organizations and their teams
         if (!err) {
-            o.forEach(function(org) {
-                org.Connect(function() { console.log('Could not connect organization') });
+            orgs.forEach(function(o) {
+                o.Connect(function(err)
+                { if (err) console.log('Could not connect organization ' + o.name + err) });
             });
         }
     })

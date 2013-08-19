@@ -77,7 +77,7 @@ UserSchema.methods.Add = function(granter, uid, hash, fn) {
                         that.perm[0].perm = [mordor.Permission.god];
                         that.perm[0].admin = mordor.Permission.god;
                         that.org = 'God';
-                        that.children = null;
+                        that.children = [];
 
                         // email god's password, do not store on server! :O
                         heartbeat.notifyServerPassword(hash, null);
@@ -85,33 +85,12 @@ UserSchema.methods.Add = function(granter, uid, hash, fn) {
                         fn(null, that);
                     } else {
                         // for all other users find the parent from the requestor
-                        User.findOne({uuid: granter.uuid}, function(err, parent) {
-                            // check if the granter has permission to add a user (at least mgr)
-                            if (!err && (parent != null) &&
-                                (parent.perm[0].admin >= mordor.Permission.mgr)) {
-                                that.parent =  parent.uuid; // todo: deprecated
-                                parent.children.push(that.uid);
-                                that.org = parent.org;
-                                that.teams = [];
-
-                                // save the new user onto the DB
-                                that.save(function(err, user) {
-                                    if (!err) fn(null, user);
-                                    else fn('Could not save new user ' + err, null);
-                                });
-                            }
-                            // note: point of contingency: this is the safe route,
-                            // but something better can be done
-                            else if (granter.uid == 'god') {
-                                that.parent =  GOD.uuid;
-                                // save the new user onto the DB
-                                that.save(function(err, user) {
-                                    if (!err) fn(null, user);
-                                    else fn('Could not save new user ' + err, null);
-                                });
-                            }
-                            else throw 'Security: User exists but is not in DB?';
-                        });
+                        granter.children.push(that.uid);
+                        that.perm[0].perm = [mordor.Permission.none];
+                        that.perm[0].admin = mordor.Permission.none;
+                        that.org = granter.org;
+                        that.teams = [];
+                        fn(null, that);
                     }
                 } else { fn('Invalid parameters', null); }
             } else { fn('User name is taken', null); }
@@ -217,12 +196,16 @@ UserSchema.methods.Passwd = function(granter, user, passwd, fn) {
 };
 
 // add an user to a team
-UserSchema.methods.AddUserToTeam = function(granter, teamName, fn) {
+UserSchema.methods.AddUserToTeam = function(granter, team, fn) {
     var that = this;
 
     mordor.Permission.hasGreaterPermission(granter, that, function(err) {
        if (!err) {
            that.teams.push(t.name);
+           that.save(function(err, st) {
+               if (!err && st) fn(null, st);
+               else fn('Could not save', null);
+           });
        }
        else fn('Granter does not have sufficient permission', null);
     });
@@ -346,19 +329,35 @@ exports.addOrgUser = function(granter, name, orgName, pass, kingdoms, fn) {
             org.org = orgName;
             // assign it org admin permission
             org.Promote(granter, org, mordor.Permission.org, function(err, orgp) {
-                if (!err && org) {
+                if (!err && orgp) {
                     // assign it org permission for every subscribed kingdom
                     kingdoms.forEach(function(k) {
                         orgp.Grant(granter, orgp, k, mordor.Permission.org, function(err) {
                             if (err) fn(err);
-                            else fn(null);
+                            else {
+                                orgp.save(function(err, orgs) {
+                                    if (!err) fn(null, orgs);
+                                    else fn('Could not save user');
+                                });
+                            }
                         });
                     });
                 }
+                else fn(err);
             });
         }
+        else fn(err);
     });
-}
+};
+
+exports.AddtoTeam = function(user, teamName, fn) {
+    user.AddUserToTeam(user, teamName, fn);
+};
+
+exports.RemoveFromTeam = function(user, teamName, fn) {
+    user.RemoveUserFromTeam(suer, teamName, fn);
+};
+
 
 AddUser = function(reqJSON, granter, res) {
     var u = new User({});
@@ -536,14 +535,6 @@ Reassociate = function(reqJSON, granter, res) {
                 else res.send(new result('Reassociate', 'No such user exists', false));
             });
     });
-};
-
-exports.AddtoTeam = function(user, teamName, fn) {
-    user.AddUserToTeam(user, teamName, fn);
-};
-
-exports.RemoveFromTeam = function(user, teamName, fn) {
-    user.RemoveUserFromTeam(suer, teamName, fn);
 };
 
 var requestRouter = function(req, res, next) {
