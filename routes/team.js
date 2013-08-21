@@ -19,6 +19,8 @@ var uuid = require('node-uuid');
 var Validator = require('jsonschema').Validator;
 var v = new Validator();
 
+var entity = require('./entity');
+
 // the local database storing organization schemas
 var settingsdb = 'mongodb://localhost/winterfell';
 
@@ -150,7 +152,6 @@ TeamSchema.methods.GetConnection = function() {
 
 TeamSchema.methods.AddUser = function(user, fn) {
     this.users.push(user.uid);
-    var entity = require('./entity');
 
     var that = this;
     entity.AddtoTeam(user, this.connectionString, function(err) {
@@ -167,7 +168,6 @@ TeamSchema.methods.RemoveUser = function(user, fn) {
 
     this.users.forEach(function(u) {
         if (u == user.uid) {
-            var entity = require('./entity');
 
             that.users.remove(ctr);
             entity.RemoveFromTeam(user, this.connection, function(err) {
@@ -192,7 +192,7 @@ var OrganizationSchema = new Schema({
     dbConnection: String,
     dbName: { type: String, default: uuid.v4() },
     teams: [String],
-    rootNodes: [string] // specifically for tree searching
+    rootNodes: [String] // specifically for tree searching
 });
 OrganizationSchema.index({ name: 1 });
 
@@ -262,7 +262,7 @@ OrganizationSchema.methods.CreateTeam = function(user, name, dbConnection, dbNam
             if (!err && t) {
                 that.teams.push(t.name);
                 // no parent specified, this team qualifies as a root node
-                if (!parent) this.rootNodes.push(t.name);
+                if (!parent) that.rootNodes.push(t.name);
                 // connect to the team's database
                 t.Connect(function(err) {
                     // now the org's data can be updated
@@ -281,29 +281,6 @@ OrganizationSchema.methods.Destroy = function() {
     var conn = ConnMgr.getConnection(this.connectionString);
     this.Disconnect(conn);
     this.delete(fn);
-};
-
-OrganizationSchema.methods.AddUserToTeam = function(teamName, user, fn) {
-    var conn = ConnMgr.getConnection(this.connectionString);
-    var Team = conn.goose.model("TeamSchema", TeamSchema);
-
-    if (conn) Team.findOne( {name: teamName}, function(err, t) {
-        if (user.d)
-        if (!err && t) t.AddUser(user, fn);
-        else fn('No such team exists', null);
-    });
-    else fn('Could not get database connection', null);
-};
-
-OrganizationSchema.methods.RemoveUserFromTeam = function(teamName, user, fn) {
-    var conn = ConnMgr.getConnection(this.connectionString);
-    var Team = conn.goose.model("TeamSchema", TeamSchema);
-
-    if (conn) Team.findOne( {name: teamName}, function(err, t) {
-        if (!err && t) t.RemoveUser(user, fn);
-        else fn('No such team exists', null);
-    });
-    else fn('Could not get database connection', null);
 };
 
 OrganizationSchema.methods.FindTeam = function(teamName, fn) {
@@ -379,9 +356,11 @@ OrganizationSchema.methods.TeamTree = function(fn) {
 var Organization = mongoose.model("OrganizationSchema", OrganizationSchema);
 Organization.ensureIndexes( function(err) { if (err) console.log("ensureInedxes failed") } );
 
-exports.FindOrganization = function(name, fn) {
+var findOrganization = function(name, fn) {
     Organization.findOne({"name": name }, fn);
 };
+exports.FindOrganization = findOrganization;
+
 
 ////////////////////////////////
 //   Permission Verification for
@@ -520,16 +499,22 @@ var addUserSchema = {
 var AddUser = function(granter, json, fn) {
     if (!v.validate(json, addUserSchema).errors.length) {
         findOrganization(granter.org, function(err, org) {
+            console.log(granter.org)
             if (!err && org) {
                 org.FindTeam(json.team, function(err, t) {
-                    verify(granter, t, function(err) {
-                        if (!err) {
-                            org.AddUserToTeam(json.team, json.name, function(err, u) {
-                                if (!err) fn(null, { useruuid: u.uuid });
-                                else fn(err, null);
+                    if (!err && t) entity.findByUsername(json.name, function(err,  u) {
+                        if (!err && u) {
+                            // verify if the granter owns the team, or if the granter is higher-up
+                            verify(granter, t, function(err) {
+                                if (!err) {
+                                    t.AddUser(u, function(err, au) {
+                                        if (!err) fn(null, { useruuid: au.uuid });
+                                        else fn(err, null);
+                                    });
+                                }
+                                else fn('User does not have permission to do that');
                             });
                         }
-                        else fn('User does not have permission to do that');
                     });
                 });
             }
@@ -581,8 +566,7 @@ var GodCreatesAnOrg = function(user, json, fn) {
             // create an organization an user and bind the user to that organization
             org.Create(user, json.name, json.dbConnection, json.dbName, function(err, newo) {
                 if (!err && newo) {
-                    var entity = require('./entity');
-                    entity.addOrgUser(user, json.name, newo.connectionString,
+                    entity.addOrgUser(user, json.name, newo.name,
                         json.hash, json.kingdoms, function(err, newu) {
                         if (!err && newu) {
                             var response = {
@@ -639,13 +623,11 @@ var teamServer = function(req, res, next) {
 
         case 'removeuser':
             DelUser(req.user, req.body.body, function(err) {
-                res.send(new result(req.request, err, (err ? false : true)));
             });
             break;
 
         case 'getallusers':
             GetAllUsers(req.user, req.body.body, function(err) {
-                res.send(new result(req.request, err, (err ? false : true)));
             });
             break;
 

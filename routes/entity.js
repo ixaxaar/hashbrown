@@ -15,6 +15,10 @@ var mongoose = require('mongoose')
     , ObjectId = Schema.ObjectId;
 mongoose.connect('mongodb://localhost/persistence');
 
+// json schema validation - for request jsons
+var Validator = require('jsonschema').Validator;
+var v = new Validator();
+
 // Internal dependencies
 var mordor = require('./ODNSWIM');
 var heartbeat = require('./heartbeat');
@@ -359,6 +363,21 @@ exports.RemoveFromTeam = function(user, teamName, fn) {
 };
 
 
+
+/**
+ * json body structure:
+ * Input:
+ * {
+ *  name: String,
+ *  team: String
+ * }
+ *
+ * Output:
+ * {
+ *  useruuid: String
+ * }
+ *
+ */
 AddUser = function(reqJSON, granter, res) {
     var u = new User({});
 
@@ -367,8 +386,13 @@ AddUser = function(reqJSON, granter, res) {
             if (err || !u)
                 res.send(new result('Add', err, false));
             else
-                res.send(new result('Add',
-                    'User ' + reqJSON.username + ' created', true));
+                u.save(function(err, u) {
+                    if (!err)
+                        res.send(new result('Add',
+                            'User ' + reqJSON.username + ' created', true));
+                    else
+                        res.send(new result('Add', err, false));
+                });
         });
 };
 
