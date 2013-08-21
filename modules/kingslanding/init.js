@@ -4,6 +4,6 @@
  * Time: 9:55 PM
  */
 
-exports.init = function(){
+module.exports = function(){
     // do as you wish
 }

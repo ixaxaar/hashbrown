@@ -127,7 +127,7 @@ exports.initKingdom = function(app, kingdomName){
             if (kingdom.name == kingdomName) {
                 var modInit = require(process.cwd() +
                     '/modules/' + kingdom.dirName + '/' + kingdom.scripts.init);
-                modInit.init();
+                modInit();
                 ret = true;
             }
         });

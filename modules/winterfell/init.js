@@ -4,6 +4,7 @@
  * Time: 9:56 PM
  */
 
-exports.init = function(){
-    // do as you wish
-}
+module.exports = function(){
+//    var winterfell = require('./lib/winterfell');
+//    winterfell();
+};

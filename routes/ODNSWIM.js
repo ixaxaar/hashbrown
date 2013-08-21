@@ -302,7 +302,7 @@ exports.openBlackGate = function(req, res, next) {
                     Permission.calcMaxPermission(req.user, k, function(err, p) {
                         if ((!err) && (p >= Permission.access)) r = true;
                     });
-                }
+                } else r = true;
             });
         } else r = true;
 
