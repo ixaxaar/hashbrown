@@ -1,0 +1,20 @@
+extends layout
+block content
+    div.container
+        div.login-app
+            div.login-header.text-center
+                span#header Welcome HashBrown
+
+            div.login-form.text-center
+                form.form-horizontal.form-login-app(action='/login',method='post')
+                    div.form-group
+                        label.col-lg-4.control-label(for="inputEmail") Email
+                        div.col-lg-8
+                            input#inputEmail.form-control(type="text", placeholder="Email")
+                    div.form-group
+                        label.col-lg-4.control-label(for="inputPassword") Password
+                        div.col-lg-8
+                            input#inputPassword.form-control(type="password", placeholder="Password")
+                    div.form-group
+                        div.col-lg-12
+                            button.btn.btn-default(type="submit") Sign in
