@@ -5,6 +5,8 @@ var mongoose = require('mongoose')
     , ObjectId = Schema.ObjectId;
 var uuid = require('node-uuid');
 
+var _ = require('underscore');
+
 // Array Remove - By John Resig (MIT Licensed)
 Array.prototype.remove = function(from, to) {
     var rest = this.slice((to || from) + 1 || this.length);
@@ -25,23 +27,9 @@ var ContentSchema = new Schema({
     location: String, // locally accessible address of the content
     description: String // markdown - description of the content
 });
+exports.ContentSchema = ContentSchema;
 ContentSchema.index({ displayName: 1 });
 var Content = mongoose.model("ContentSchema", ContentSchema);
-
-// the unit of each ContentHistory element, does not have separate collection in db
-var __ContentHistorySchema = new Schema({
-    changed: { type: Date, default: Date.now() },
-    content: String // note: content is not destroyed, it is linked!
-});
-var __ContentHistory = mongoose.model("__ContentHistorySchema", __ContentHistorySchema);
-
-// maintain the history of previous versions of content
-var ContentHistorySchema = new Schema({
-    uuid: String, // this links with the most recent post
-    versions: [__ContentHistorySchema], // array of pervious version posts
-    hanging: [__ContentHistorySchema] // un-reviewed versions
-});
-var ContentHistory = mongoose.model("ContentHistorySchema", ContentHistorySchema);
 
 ////////////////////////////////
 //   Child Feed Schema
@@ -83,30 +71,11 @@ var FeedSchema = new Schema({
     tags: [TagSchema], // tags to group similar feeds
     teams: [],
     acl: [String], // @mentions of people
-    children: [ChildFeedSchema] // stack of child feeds
+    children: [ChildFeedSchema], // stack of child feeds
+    versioned: { type: Boolean, default: false } // is this versioned?
 });
-FeedSchema.index({owner: 1, updated: -1});
-FeedSchema.index({teams: 1});
-
-FeedSchema.pre('save', true, function(next, done) {
-    this.find()
-});
-
-FeedSchema.post('save',commit, function(doc) {
-    var history = doc.connection.model('ContentHistorySchema');
-    history.find({: doc.content.displayname}, function(err, his) {
-        // ahh so, we already have history of this document
-        if (obj) {
-            // commit as a version
-            if (commit) {
-                var _his = new __ContentHistory({ content: doc })
-            }
-            // this is a hanging version
-            else {
-            }
-        }
-    });
-});
+FeedSchema.index({ owner: 1, updated: -1 });
+FeedSchema.index({ teams: 1 });
 
 FeedSchema.methods.CreateFeed = function(user, org, json, fn) {
 /**
