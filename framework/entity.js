@@ -306,7 +306,6 @@ UserSchema.methods.removeUserFromTeam = function(granter, teamName, fn) {
 
 // register the model globally
 var User = mongoose.model("UserSchema", UserSchema);
-exports.User = User; // todo: this is only for testing
 User.ensureIndexes(function(err){ if (err) console.log('ensureIndexes failed')});
 
 ////////////////////////////////
