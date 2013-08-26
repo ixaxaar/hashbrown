@@ -19,7 +19,8 @@
     "memcached": "*",
     "jade": "*",
     "marked": "*",
-    "jsonschema": "*"
+    "jsonschema": "*",
+    "tobi" : "*"
   },
   "devDependencies": {
     "nodemon": "*"

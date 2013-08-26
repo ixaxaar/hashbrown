@@ -1,11 +1,3 @@
-/**
- * Created with JetBrains WebStorm.
- * User: ixaxaar
- * Date: 7/8/13
- * Time: 4:02 PM
- * To change this template use File | Settings | File Templates.
- */
-
 
 var mongoose = require('mongoose')
     , Schema = mongoose.Schema
@@ -16,8 +8,11 @@ var path = require('path');
 var uuid = require('node-uuid');
 
 // json schema validation - for request jsons
-var Validator = require('jsonschema').Validator;
-var v = new Validator();
+var validation = require('./validation')
+    , v = validation.validator
+    , createTeamSchema = validation.createTeamSchema
+    , addUserSchema = validation.addUserSchema
+    , godCreatesAnOrgSchema = validation.godCreatesAnOrgSchema;
 
 var entity = require('./entity');
 
@@ -150,11 +145,11 @@ TeamSchema.methods.GetConnection = function() {
     return ConnMgr.getConnection(this.connectionString);
 };
 
-TeamSchema.methods.AddUser = function(user, fn) {
+TeamSchema.methods.addUser = function(user, fn) {
     this.users.push(user.uid);
 
     var that = this;
-    entity.AddtoTeam(user, this.connectionString, function(err) {
+    entity.addtoTeam(user, this.connectionString, function(err) {
         that.save(function(err, sthat) {
             if (!err) fn(null, sthat);
             else fn('Could not add team to user');
@@ -170,7 +165,7 @@ TeamSchema.methods.RemoveUser = function(user, fn) {
         if (u == user.uid) {
 
             that.users.remove(ctr);
-            entity.RemoveFromTeam(user, this.connection, function(err) {
+            entity.removeFromTeam(user, this.connection, function(err) {
                 if (!err) fn(null, this);
                 else fn('Could not add team to user');
             });
@@ -432,20 +427,7 @@ var result = function(uuid, type, msg, outcome){
  * }
  *
  */
-var createTeamSchema = {
-    "id": "/createTeamSchema",
-    "type": "object",
-    "properties": {
-        "org": { "type": "string" },
-        "parent": { "type": "string" },
-        "name": { "type": "string" },
-        "dbName": { "type": "string" },
-        "dbConnection": { "type": "string" }
-    }
-};
-v.addSchema(createTeamSchema, '/createTeamSchema');
-
-var CreateTeam = function(user, json, fn) {
+var createTeam = function(user, json, fn) {
     if (!v.validate(json, createTeamSchema).errors.length) {
         Organization.findOne({ name: json.org }, function(err, org) {
             if (!err && org) {
@@ -471,7 +453,7 @@ var CreateTeam = function(user, json, fn) {
     }
     else fn('Request format is wrong');
 };
-
+exports.createTeam = createTeam;
 
 /**
  * json body structure:
@@ -487,16 +469,7 @@ var CreateTeam = function(user, json, fn) {
  * }
  *
  */
-var addUserSchema = {
-    "id": "/addUserSchema",
-    "type": "object",
-    "properties": {
-        "name": String,
-        "team": String
-    }
-};
-
-var AddUser = function(granter, json, fn) {
+var addUser = function(granter, json, fn) {
     if (!v.validate(json, addUserSchema).errors.length) {
         findOrganization(granter.org, function(err, org) {
             console.log(granter.org)
@@ -507,7 +480,7 @@ var AddUser = function(granter, json, fn) {
                             // verify if the granter owns the team, or if the granter is higher-up
                             verify(granter, t, function(err) {
                                 if (!err) {
-                                    t.AddUser(u, function(err, au) {
+                                    t.addUser(u, function(err, au) {
                                         if (!err) fn(null, { useruuid: au.uuid });
                                         else fn(err, null);
                                     });
@@ -523,6 +496,7 @@ var AddUser = function(granter, json, fn) {
     }
     else fn('Request format is wrong');
 };
+exports.addUser = addUser;
 
 /**
  * JSON body structure:
@@ -541,24 +515,7 @@ var AddUser = function(granter, json, fn) {
  * }
  *
  */
-
-var godCreatesAnOrgSchema  = {
-    "id": "/godCreatesAnOrgSchema",
-    "type": "object",
-    "properties": {
-        "name": { "type": "string", "required": true },
-        "dbConnection": { "type": "string", "required": true },
-        "dbName": { "type": "string", "required": true },
-        "hash": { "type": "string", "required": true },
-        "kingdoms": {
-            "type": "array",
-            "items": { "type": "string" }
-        }
-    }
-};
-v.addSchema(godCreatesAnOrgSchema, '/godCreatesAnOrgSchema');
-
-var GodCreatesAnOrg = function(user, json, fn) {
+var godCreatesAnOrg = function(user, json, fn) {
     if (!v.validate(json, godCreatesAnOrgSchema).errors.length) {
         if (user.uid == 'god') {
             var org = new Organization();
@@ -583,112 +540,10 @@ var GodCreatesAnOrg = function(user, json, fn) {
         else fn('thou shalt not be god!');
     } else fn('Request format is wrong');
 };
+exports.godCreatesAnOrg = godCreatesAnOrg;
 
-/**
- * JSON body structure:
- * Input
- * {
- *  name: String,
- *  dbConnection: String
- * }
- *
- * Output:
- * {
- *  orguuid: String,
- *  useruuid: String
- * }
- *
- */
 
-/**
- * JSON structure:
- * {
- *  uuid: String,
- *  request: String,
- *  body: {}
- * }
- *
- */
-var teamServer = function(req, res, next) {
-    req.accepts('application/json');
-
-    if (req.body) switch(req.body.request) {
-        case 'adduser':
-            AddUser(req.user, req.body.body, function(err, response) {
-                res.send(new result(req.body.uuid, req.body.request,
-                    (response ? response : err),
-                    (err ? false : true)));
-            });
-            break;
-
-        case 'removeuser':
-            DelUser(req.user, req.body.body, function(err) {
-            });
-            break;
-
-        case 'getallusers':
-            GetAllUsers(req.user, req.body.body, function(err) {
-            });
-            break;
-
-        default:
-            res.send(new result(req.request, 'Invalid request', false));
-            break;
-    }
-};
-
-var orgServer = function(req, res, next) {
-    req.accepts('application/json');
-
-    if (req.body) switch(req.body.request) {
-        case 'addteam':
-            CreateTeam(req.user, req.body.body, function(err, response) {
-                res.send(new result(req.body.uuid, req.body.request,
-                    (response ? response : err),
-                    (err ? false : true)));
-            });
-            break;
-
-        case 'removeteam':
-            DelTeam(req.user, req.body.body, function(err, response) {
-                res.send(new result(req.body.uuid, req.body.request,
-                    err,
-                    (response ? response : err),
-                    (err ? false : true)));
-            });
-            break;
-
-        case 'createorg':
-            GodCreatesAnOrg(req.user, req.body.body, function(err, response) {
-                res.send(new result(req.body.uuid, req.body.request,
-                    (response ? response : err),
-                    (err ? false : true)));
-            });
-            break;
-
-        case 'removeorg':
-            GodDestroysAnOrg(req.user, req.body.body, function(err, response) {
-                res.send(new result(req.body.uuid, req.body.request,
-                    (response ? response : err),
-                    (err ? false : true)));
-            });
-            break;
-            
-        default:
-            res.send(new result(req.body.uuid, req.body.request, 'Invalid request', false));
-            break;
-    }
-};
-
-////////////////////////////////
-//   Winterfell Constructor
-////////////////////////////////
-
-var ConnectAll = function(app) {
-    // set up the routes
-    app.post('/team', teamServer);
-    app.post('/organization', orgServer);
-
+var teamConstructor = function() {
     // connect everything we know of
     Organization.find({}, function(err, orgs) {
         // connect all organizations and their teams
@@ -700,7 +555,7 @@ var ConnectAll = function(app) {
         }
     })
 };
-exports.Init = ConnectAll;
+exports.team = teamConstructor;
 
 
 

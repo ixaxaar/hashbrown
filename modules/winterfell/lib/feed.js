@@ -7,6 +7,13 @@ var uuid = require('node-uuid');
 
 var _ = require('underscore');
 
+// json schema validation - for request jsons
+var Validator = require('jsonschema').Validator;
+var v = new Validator();
+
+var history = require('./history');
+var framework = require('../../../framework');
+
 // Array Remove - By John Resig (MIT Licensed)
 Array.prototype.remove = function(from, to) {
     var rest = this.slice((to || from) + 1 || this.length);
@@ -48,9 +55,9 @@ ChildFeedSchema.index({ owner: 1, updated: -1 });
 
 var ChildFeed = mongoose.model("ChildFeedSchema", ChildFeedSchema);
 
+// a one-field schema for now, maybe will be expanded later
 var TagSchema = new Schema({
-    name:   String,
-    team: { type: Boolean, default: false }
+    name:   String
 });
 TagSchema.index({ name: 1 });
 
@@ -77,114 +84,169 @@ var FeedSchema = new Schema({
 FeedSchema.index({ owner: 1, updated: -1 });
 FeedSchema.index({ teams: 1 });
 
-FeedSchema.methods.CreateFeed = function(user, org, json, fn) {
-/**
-{
-    "content": "",        // markdown
-    "file": "",            // filename to be uploaded
-    "type": "",           // file mime type http://stackoverflow.com/questions/4581308/jquery-or-javascript-get-mime-type-from-url
-    "belongs": [],        // team (optional if private)
-    "mentions": [],        // array of team-mates (optional)
-    "private": "",        // boolean - private or public post
-    "tags": []            // optional - tags for faster searching
-}
-*/
-    this.created = Date.now();
-    this.owner = user.uid;
-    this.content[0] = new Content({ file: null, type: null, location: null, description: null});
-    // for uploaded file
-    if (json.file) {
-        this.content[0].file = json.file;
-        if (json.type) this.content[0].type = json.type;
-    }
+// add histopry support for these feeds
+history(FeedSchema);
 
-    if (json.content) this.content[0].description = json.content;
-    this.children = [];
+/** JSON request structure:
+ {
+     "content": "",        // markdown
+     "file": "",            // filename to be uploaded
+     "type": "",           // file mime type http://stackoverflow.com/questions/4581308/jquery-or-javascript-get-mime-type-from-url
+     "name": ""             // display name of the file
+     "location": ""         // location of the file
+     "belongs": [],        // team (optional if private)
+     "mentions": [],        // array of user's uuids (optional)
+     "private": "",        // boolean - private or public post
+     "tags": [],           // optional - tags for faster searching
+     "versioned": ""       // optional, boolean
+ }
+ Output:
+ {
+    "uuid" : ""            // uuid of the new post
+ }
+ */
+var createFeedSchema = {
+    "id": "/createFeedSchema",
+    "type": "object",
+    "properties": {
+        "content": { "type": "string", "required": true },
+        "file": { "type": "string" }, //todo:  should we make it mandatory to upload files as well?
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "belongs": {
+            "type": "array",
+            "items": "string"
+        },
+        "mentions": {
+            "type": "array",
+            "items": "string"
+        }
+    },
+    "private": { "type": "string" },
+    "tags": {
+        "type": "array",
+        "items": "string"
+    },
+    "versioned": { "type": "boolean" }
+};
+v.addSchema(createFeedSchema, '/createFeedSchema');
 
-    var that = this;
+FeedSchema.methods.CreateFeed = function(user, json, fn) {
+    if (!v.validate(json, createFeedSchema).errors.length) {
+        this.created = Date.now();
+        this.owner = user.uid;
+        this.children = [];
 
-    // if the activity is private
-    if (json.private) {
-        this.private = true;
-        this.teams = null;
-    } else  if (json.teams) {
-        json.teams.forEach(function(t) {
-            team.FindTeam(t, function(err, ft) {
-                // push all users in that team to the acl
-                if (!err && ft) {
-                    that.teams.push(ft.uuid);
-                    that.tags.push(ft.uuid); // for faster searching
-                }
-            })
+        // fill-in the content
+        this.content = [new Content({})];
+        // for uploaded file
+        if (json.file) {
+            this.content[0].file = json.file;
+            this.content[0].type = (json.type) ? json.type : null;
+            this.content[0].displayname = (json.name) ? json.name : json.file;
+            this.content[0].videoTypes = null; // not yet, not yet!
+            this.content[0].location = (json.location) ? json.location : null;
+        }
+        this.content[0].description = (json.description) ? json.content : "";
+
+        var that = this;
+
+        // if the activity is private, only @mentions count, not teams
+        if (json.private) {
+            this.private = true;
+            this.teams = [];
+        } else if (json.belongs.length) {
+            json.belongs.forEach(function(t) {
+                // only add teams that the user himself belongs to
+                if(_.indexOf(user.teams, t) != -1)
+                    that.teams.push(t);
+            });
+        }
+
+        // add all the tags
+        if (json.tags.length) {
+            json.tags.forEach(function(t) {
+                that.tags.push(new Tag({ name: t }));
+            });
+        }
+
+        // add all those who were mentioned to this feed's acl
+        json.mentions.forEach(function(m) {
+            // note: covered query
+            user.model("UserSchema").findOne({ uid: m }, { uid: 1 }, function(err, u) {
+                if (!err && u) that.acl.push(u.uid);
+            });
+        });
+
+        // if verdsioning is asked to be enabled
+        if (json.versioned) this.versioned = true;
+
+        // commit to DB
+        this.save(function(err, t) {
+            if (!err || t) fn(null, { "uuid": t.uuid });
+            else fn('Could not save', null);
         });
     }
-
-    // add all the tags
-    if (json.tags.length > 0) {
-        json.tags.forEach(function(t) {
-            that.tags.push(new Tag({ name: t }));
-        });
-    }
-
-    // add all those who were mentioned to this feed's acl
-    json.mentions.forEach(function(m) {
-        // make sure this query is covered
-        Users.findOne({ uid: m }, { uid: 1 }, function(err, u) {
-            if (!err && u) that.acl.push(u);
-        });
-    });
-
-    // commit to DB
-    this.save(function(err, t) {
-        console.log(err)
-        if (!err || t) fn(null, t);
-        else fn('Could not save', null);
-    });
+    else fn('Request format is wrong');
 };
 
 FeedSchema.methods.Delete = function(fn) {
     this.remove(fn);
 };
 
-FeedSchema.methods.AddChild = function(user, json, fn) {
-/**
+/** JSON request structure:
  {
      "uuid": ""            // uuid of the main post
      "content": "",        // markdown
-     "file": "",            // filename to be uploaded
-     "type": "",           // file mime type http://stackoverflow.com/questions/4581308/jquery-or-javascript-get-mime-type-from-url
      "mentions": [],        // array of mentions (optional)
-     "teams": []            // feeds are always dsiplayed as per teams,
-                            // so frontend has this info, leads to faster searching on the backend
+ }
+ Output:
+ {
+    "uuid": ""              // uuid of this child post
  }
  */
-
-    var c = new ChildFeed({});
-    c.owner = user.uid;
-    c.created = Date.now();
-
-    c.content[0] = new Content({ file: null, type: null, location: null, description: null});
-    if (json.content) c.content[0].description = json.content;
-    if (json.file) {
-        c.content[0].file = json.file;
-        if (json.type) c.content[0].type = json.type;
+var addChildSchema = {
+    "id": "/createFeedSchema",
+    "type": "object",
+    "properties": {
+        "uuid": { "type": "string", "required": "true" },
+        "content": { "type": "string", "required": "true" },
+        "mentions": {
+            "type": "array",
+            "items": "string"
+        }
     }
+};
+FeedSchema.methods.AddChild = function(user, json, fn) {
+    if (!v.validate(json, createFeedSchema).errors.length) {
+        var c = new ChildFeed({});
+        c.owner = user.uid;
+        c.created = Date.now();
 
-    // add all those who are mentioned to this post's acl
-    var that = this;
-    if (json.mentions) json.mentions.forEach(function(m) {
-        // make sure this query is covered
-        Users.findOne({ uid: m }, { uid: 1 }, function(err, u) {
-            if (!err && u) that.acl.push(u);
+        c.content = [new Content({})];
+        (json.content) ? c.content[0].description = json.content : "";
+        if (json.content) c.content[0].description = json.content;
+
+        // add all those who are mentioned to this post's acl
+        var that = this;
+        if (json.mentions) json.mentions.forEach(function(m) {
+            // make sure this query is covered
+            user.model("UserSchema").findOne({ uid: m }, { uid: 1 }, function(err, u) {
+                // we add the mentions in each sub-post to the main pot:
+                // afa security is concerned, this implies a friend-of-friend kind
+                // of open-ness facilitating inter-team discussions
+                if (!err && u) that.acl.push(u.uid);
+            });
         });
-    });
 
-    this.children.push(c);
-    this.modified = Date.now();
-    this.save(function(err, f) {
-        if (!err || f) fn(null, f);
-        else fn('Could not add child feed', null);
-    });
+        this.children.push(c);
+        this.modified = Date.now();
+        this.save(function(err, f) {
+            if (!err || f) fn(null, { "uuid": _.last(f.children).uuid });
+            else fn('Could not add child feed', null);
+        });
+    }
+    else fn('Request format is wrong');
 };
 
 FeedSchema.methods.removeChild = function(uuid, fn) {
@@ -215,12 +277,30 @@ var findFeed = function(uuid, fn) {
 };
 exports.FindFeed = findFeed;
 
+////////////////////////////////////////
+//      Permissions
+////////////////////////////////////////
+
+var verify = function(requestor, resource) {
+    // the "usual" way - this resource belongs to the requesting guy
+    // give him access
+    if (requestor.uid === resource.owner)
+        return true;
+
+    // the "admin"'s special way - all admins and higher get full access
+    // todo: what about managers? well, they get squat
+    return (requestor.org === resource.org) &&
+            (requestor.perm[0].admin >= framework.Permission.admin);
+};
+
+
+
 var RequestRouter = function(req, res, next) {
     if (req.body)
     switch(req.body.request) {
         case 'newfeed':
             var F = new Feed({});
-            F.CreateFeed(req.user, req.user, req.body.body, function(err, f) {
+            F.CreateFeed(req.user, req.body.body, function(err, f) {
                 if (!err) res.send(f);
                 else res.send(err);
             });

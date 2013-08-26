@@ -7,19 +7,21 @@
  */
 
 var express = require('express')
-    , realm = require('./routes/realm')
-    , fournotfour =  require('./routes/fournotfour')
-    , minas = require('./routes/minas')
-    , login = require('./routes/login')
+    , realm = require('./framework/realm')
+    , fournotfour =  require('./framework/fournotfour')
+    , minas = require('./framework/minas')
+    , login = require('./framework/login')
     , http = require('http')
     , path = require('path')
-    , entity = require('./routes/entity')
-    , team = require('./routes/team')
+    , entity = require('./framework/entity')
+    , team = require('./framework/team')
     , passport = require('passport')
-    , heartbeat = require('./routes/heartbeat')
-    , mordor = require("./routes/ODNSWIM");
+    , heartbeat = require('./framework/heartbeat')
+    , mordor = require("./framework/ODNSWIM");
 
 var app = express();
+// for tobi testing
+module.exports = app;
 
 mordor.createTheBlackGates(passport);
 
@@ -35,7 +37,7 @@ app.configure('development', function(){
     mordor.BlackGate(app, express, passport);
     app.use(express.static(path.join(__dirname, 'public')));
     app.use(app.router);
-})
+});
 
 //TODO: define production env
 // app.configure('production', function(){})
@@ -57,7 +59,7 @@ if (!kingdoms) {
 app.get('/login', login.login);
 
 app.post('/login', function(req, res, next) {
-//    req.accepts('application/json');
+    req.accepts('application/json');
     passport.authenticate('local', function(err, user, info) {
         if (err) { return next(err) }
         if (!user) {
@@ -93,9 +95,7 @@ app.get('/', mordor.openBlackGate, minas.tirith);
 app.get('/settings', mordor.openBlackGate, minas.ithil);
 
 // setup the settings backend handler
-entity.Setup(app);
 
-team.Init(app);
 
 // initialize all APIs here
 

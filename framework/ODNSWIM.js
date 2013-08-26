@@ -15,8 +15,17 @@ var mongoose = require('mongoose')
     , Schema = mongoose.Schema
     , ObjectId = Schema.ObjectId;
 
+// json schema validation - for request jsons
+var Validator = require('jsonschema').Validator;
+var v = new Validator();
+
 // Internal Dependencies
 var entity = require('./entity');
+
+// json schema validation - for request jsons
+var validation = require('./validation')
+    , v = validation.validator
+    , userValidationSchema = validation.userValidationSchema;
 
 
 /** How ODNSWIM works:
@@ -76,12 +85,15 @@ function _generateKeyToMordor(hash) {
     return salt + crypto.createHash("md5").update(hash).digest("hex");
 }
 
+////////////////////////////////////
+//      Schemas
+////////////////////////////////////
+
 /**
  * User's password hash structure
  */
 
 var PasswordSchema = Schema({
-    user:       String,
     hash:       String
 });
 
@@ -98,11 +110,14 @@ exports.Password = PasswordS;
  */
 
 UserPermissionSchema = Schema({
-    uuid:       String,
     perm:       [Number],
     admin:      Number,
     password:   [PasswordSchema]
 });
+
+////////////////////////////////////
+//      Methods
+////////////////////////////////////
 
 // function having the sole authority to grant user's permissions
 UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) {
@@ -212,24 +227,24 @@ function BlackGate(app, express, passport) {
 //        maxAge:new Date(Date.now() + 3600000),
 //        store: sessionStore
     }));
-//    require('connect-redis')(express);
+    require('connect-redis')(express);
     app.use(passport.initialize());
     app.use(passport.session());
 }
 
-sessionStore = {
-    get:    function(sid, callback) {
-
-    },
-
-    set:    function(sid, session, callback) {
-
-    },
-
-    destroy:    function(sid, callback) {
-
-    }
-};
+//sessionStore = {
+//    get:    function(sid, callback) {
+//
+//    },
+//
+//    set:    function(sid, session, callback) {
+//
+//    },
+//
+//    destroy:    function(sid, callback) {
+//
+//    }
+//};
 
 exports.createTheBlackGates = function(passport) {
     // Passport session setup.

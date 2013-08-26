@@ -4,14 +4,14 @@
  * Time: 9:22 PM
  */
 
-var mordor = require('../../routes/ODNSWIM');
+var mordor = require('.././ODNSWIM');
 
 var validateAccess = function(req, res, next) {
 
 };
 
 
-//Configure this module's routes:
+//Configure this module's framework:
 //each app.get can define handlers for GET requests handled
 //by each sub-module
 module.exports = function () {
