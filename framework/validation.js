@@ -189,7 +189,6 @@ var createTeamSchema = {
     "id": "/createTeamSchema",
     "type": "object",
     "properties": {
-        "org": { "type": "string" },
         "parent": { "type": "string" },
         "name": { "type": "string" },
         "dbName": { "type": "string" },
@@ -222,6 +221,28 @@ var godCreatesAnOrgSchema  = {
 };
 
 
+var teamValidationSchema = {
+    "id": "/teamValidationSchema",
+    "type": "object",
+    "properties": {
+        "uuid": { "type": "string", "required": "true" },
+        "owner": { "type": "string", "required": "true" },
+        "name": { "type": "string", "required": "true" },
+        "orgName": { "type": "string", "required": "true" },
+        "dbConnection": { "type": "string", "required": "true" },
+        "dbName": { "type": "string", "required": "true" },
+        "users": {
+            "type": "array",
+            "items": { "type": "string" }
+        },
+        "children": {
+            "type": "array",
+            "items": { "type": "string" }
+        }
+    }
+};
+
+v.addSchema(teamValidationSchema, '/teamValidationSchema');
 v.addSchema(createTeamSchema, '/createTeamSchema');
 v.addSchema(addUserSchema, '/addUserSchema');
 v.addSchema(godCreatesAnOrgSchema, '/godCreatesAnOrgSchema');
@@ -229,6 +250,7 @@ v.addSchema(godCreatesAnOrgSchema, '/godCreatesAnOrgSchema');
 exports.createTeamSchema = createTeamSchema;
 exports.addUserSchema = addUserSchema;
 exports.godCreatesAnOrgSchema = godCreatesAnOrgSchema;
+exports.teamValidationSchema = teamValidationSchema;
 
 
 exports.validator = v;

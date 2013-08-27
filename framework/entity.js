@@ -28,7 +28,9 @@ var validation = require('./validation')
 
 
 // Internal dependencies
-var mordor = require('./ODNSWIM');
+var mordor = require('./ODNSWIM')
+    , permissions = mordor.Permission;
+
 var heartbeat = require('./heartbeat');
 var team = require('./team');
 
@@ -75,27 +77,26 @@ var GOD = null;
 UserSchema.methods.addUser = function(granter, uid, hash, fn) {
     var that = this;
 
-//    if (!v.validate(granter, userValidationSchema).errors.length) {
-
+    if (!v.validate(granter, userValidationSchema).errors.length || GOD === null) {
         // god is created by nobody, so exempt him,
         // for all other users, the granter must be manager and above
         if ((uid === 'god' && GOD === null)  ||
-            mordor.Permission.hasAdminPermission(granter, mordor.Permission.mgr)) {
+            permissions.hasAdminPermission(granter, permissions.mgr)) {
             findByUsername(uid, function(err, existsUser) {
                 if (!err && !existsUser && uid && hash) {
                     that.uid        =   uid;
                     // create a new profile (user is email)
                     that.profile    =   new UserProfile({ uid: this.uid, email: this.uid });
                     that.perm       =   new mordor.UserPermission({perm: [],
-                        admin: 0,
-                        password: new mordor.Password({ hash: hash })
-                    });
+                                        admin: 0,
+                                        password: new mordor.Password({ hash: hash })
+                                        });
                     that.perm[0].password[0].Change(hash);
 
                     if (uid === 'god') {
                         // some special stuff, it's god after all!
-                        that.perm[0].perm = [mordor.Permission.god];
-                        that.perm[0].admin = mordor.Permission.god;
+                        that.perm[0].perm = [permissions.god];
+                        that.perm[0].admin = permissions.god;
                         that.org = 'God';
                         that.children = []; // all are god's children :O
 
@@ -106,8 +107,8 @@ UserSchema.methods.addUser = function(granter, uid, hash, fn) {
                     } else {
                         // for all other users find the parent from the requestor
                         granter.children.push(that.uid);
-                        that.perm[0].perm = [mordor.Permission.none];
-                        that.perm[0].admin = mordor.Permission.none;
+                        that.perm[0].perm = [permissions.none];
+                        that.perm[0].admin = permissions.none;
                         that.children = [];
                         that.teams = [];
                         that.org = granter.org;
@@ -116,8 +117,8 @@ UserSchema.methods.addUser = function(granter, uid, hash, fn) {
                 } else fn('User name is taken or missing parameters', null);
             });
         } else fn('Granter does not have permission to add user', null);
-//    }
-//    else fn('Request format is wrong');
+    }
+    else fn('Request format is wrong');
 };
 
 // delete a user
@@ -127,11 +128,12 @@ UserSchema.methods.deleteUser = function(granter, fn) {
         var that = this;
 
         // see if granter is higher up than the user
-        mordor.Permission.hasGreaterPermission(granter, that, function(err) {
+        permissions.hasGreaterPermission(granter, that, function(err) {
             // either granter is user's baap or the user himself!
             if (!err || granter.uid === that.uid) {
                 // find and remove from the DB
                 User.findOne({ uuid: that.uuid }).remove(function(err, u) {
+                    // todo: after a user is deleted, his parent owns everything
                     if (!err) fn(null, u);
                     else fn('Could not find and delete user', null);
                 });
@@ -143,7 +145,6 @@ UserSchema.methods.deleteUser = function(granter, fn) {
 
 // grant permissions to a user
 UserSchema.methods.grantUser = function(granter, kingdom, perm, fn) {
-    console.log(v.validate(granter, userValidationSchema))
     if (!v.validate(granter, userValidationSchema).errors.length) {
 
         var that = this;
@@ -151,7 +152,7 @@ UserSchema.methods.grantUser = function(granter, kingdom, perm, fn) {
         findKingdomByUrl(kingdom, function(err, k) {
             if (!err && k) {
                 // see if granter is higher up than the user
-                mordor.Permission.hasGreaterPermission(granter, that, function(err) {
+                permissions.hasGreaterPermission(granter, that, function(err) {
                     if (!err) {
                         that.perm[0].grant(granter, that, k, perm, function(err, u) {
                             if (!err) fn(null, u);
@@ -167,16 +168,16 @@ UserSchema.methods.grantUser = function(granter, kingdom, perm, fn) {
 };
 
 // revoke permissions from a user
-UserSchema.methods.revokeUser = function(granter, kingdom, perm, fn) {
+UserSchema.methods.revokeUser = function(granter, kingdomName, perm, fn) {
     if (!v.validate(granter, userValidationSchema).errors.length) {
 
         var that = this;
 
         // see if granter is higher up than the user
-        exports.findKingdomByUrl(kingdom, function(err, k) {
+        exports.findKingdomByUrl(kingdomName, function(err, k) {
             if (!err && k) {
                 // see if granter is higher up than the user
-                mordor.Permission.hasGreaterPermission(granter, that, function(err) {
+                permissions.hasGreaterPermission(granter, that, function(err) {
                     if (!err) {
                         that.perm[0].revoke(granter, that, k, perm, function(err, u) {
                             if (!err) fn(null, u);
@@ -213,19 +214,23 @@ UserSchema.methods.reassocUser = function(granter, newParent, fn) {
         var that = this;
 
         // see if granter has permission to change user's parent
-        mordor.Permission.hasGreaterPermission(granter, that, function(err) {
+        permissions.hasGreaterPermission(granter, that, function(err) {
             if (!err) {
-                mordor.Permission.hasGreaterPermission(granter, newParent, function(err) {
+                permissions.hasGreaterPermission(granter, newParent, function(err) {
                     if (!err) {
                         User.findOne({ "children": that.uid }, function(err, prevParent) {
                             var ctr = 0;
-                            if (!err && prevParent) prevParent.children.forEach(function(c) {
-                                if (c.uid == that.uid) prevParent.children.remove(ctr);
-                                ctr++;
-                            });
+                            if (!err && prevParent) {
+                                prevParent.children.forEach(function(c) {
+                                    if (c.uid == that.uid) prevParent.children.remove(ctr);
+                                    ctr++;
+                                });
+                                prevParent.save(function(){ console.log('could not save'); });
+                            }
                             else console.log("Previous parent not found?!");
                         });
                         newParent.children.push(that.uid);
+                        newParent.save(function(err){ if (err) console.log('could not save'); });
                         fn(null, that);
                     } else fn('New parent is not qualified', null);
                 });
@@ -233,7 +238,6 @@ UserSchema.methods.reassocUser = function(granter, newParent, fn) {
         });
     }
     else fn('Request format is wrong');
-
 };
 
 // update a user's profile data
@@ -254,9 +258,9 @@ UserSchema.methods.passwd = function(granter, passwd, fn) {
 
         var that = this;
 
-        // now this is a tricky one! - todo: does the user's manager has control?
-        mordor.Permission.hasGreaterPermission(granter, that, function(err) {
-            if (!err) {
+        // now this is a tricky one! - todo: does the user's manager have control?
+        permissions.hasGreaterPermission(granter, that, function(err) {
+            if (!err || granter.uid === that.uid) {
                 that.perm[0].changePasswd(grnter, passwd);
                 fn(null, that);
             } else fn('Granter does not have permission to change password', null);
@@ -271,11 +275,11 @@ UserSchema.methods.addUserToTeam = function(granter, team, fn) {
 
         var that = this;
 
-        mordor.Permission.hasGreaterPermission(granter, that, function(err) {
+        permissions.hasGreaterPermission(granter, that, function(err) {
             if (!err) {
                 that.teams.push(t.name);
-                that.save(function(err, st) {
-                    if (!err && st) fn(null, st);
+                that.save(function(err, user) {
+                    if (!err && st) fn(null, user);
                     else fn('Could not save', null);
                 });
             }
@@ -291,10 +295,10 @@ UserSchema.methods.removeUserFromTeam = function(granter, teamName, fn) {
 
         var that = this;
 
-        mordor.Permission.hasGreaterPermission(granter, user, function(err) {
+        permissions.hasGreaterPermission(granter, user, function(err) {
             if (!err) {
                 that.teams.forEach(function(tname) {
-                    if (tname == team.name) that.users.remove(ctr);
+                    if (tname === team.name) that.users.remove(ctr);
                     ctr++;
                 });
             }
@@ -326,13 +330,12 @@ KingdomSchema.methods.addUser = function(pkg, shift, fn) {
     var kps = mongoose.model('KingdomPermissionSchema',
         mordor.KingdomPermissionSchema);
 
-    var kingdom =
-        new Kingdom({name: id,
-            perm: new kps({uuid: id, permEntry: shift})});
+    var kingdom = new Kingdom({name: id,
+        perm: new kps({uuid: id, permEntry: shift})});
     kingdom.pkg.push(pkg);
 
     // bow down before god the moment this is created!
-    GOD.perm[0].perm[shift] = mordor.Permission.god;
+    GOD.perm[0].perm[shift] = permissions.god;
     Kingdoms.push(kingdom);
     fn(null, kingdom);
 };
@@ -374,11 +377,11 @@ var addOrgUser = function(granter, name, orgName, pass, kingdoms, fn) {
             // assign it an org
             org.org = orgName;
             // assign it org admin permission
-            org.promote(granter, mordor.Permission.org, function(err, orgp) {
+            org.promote(granter, permissions.org, function(err, orgp) {
                 if (!err && orgp) {
                     // assign it org permission for every subscribed kingdom
                     kingdoms.forEach(function(k) {
-                        orgp.grant(granter, orgp, k, mordor.Permission.org, function(err) {
+                        orgp.grant(granter, orgp, k, permissions.org, function(err) {
                             if (err) fn(err);
                             else {
                                 orgp.save(function(err, orgs) {
@@ -423,7 +426,6 @@ exports.removeFromTeam = removeFromTeam;
  *
  */
 addUser = function(granter, json, fn) {
-
     if (!v.validate(granter, userValidationSchema).errors.length &&
         !v.validate(json, addUserValidationSchema).errors.length) {
 
@@ -474,22 +476,22 @@ deleteUser = function(granter, json, fn) {
 exports.deleteUser = deleteUser;
 
 var getPermission = function(perm) {
-    var p = mordor.Permission.none;
+    var p = permissions.none;
     switch(perm) {
         case 'access':
-            p = mordor.Permission.access;
+            p = permissions.access;
             break;
         case 'modify':
-            p = mordor.Permission.modify;
+            p = permissions.modify;
             break;
         case 'mgr':
-            p = mordor.Permission.mgr;
+            p = permissions.mgr;
             break;
         case 'admin':
-            p = mordor.Permission.admin;
+            p = permissions.admin;
             break;
         case 'org':
-            p = mordor.Permission.org;
+            p = permissions.org;
             break;
         default:
             p = null;
@@ -662,6 +664,31 @@ var reassociate = function(granter, json, fn) {
 };
 exports.reassociate = reassociate;
 
+// todo: godammit do something about kingdom permissions!!!!
+// an awesome way to create trees in js! :O
+var userTree = function(entity) {
+    this.name = entity.uid;
+    this.admin = entity.perm[0].admin;
+    this.kingdomPermissions = entity.perm[0].perm;
+    this.children = [];
+
+    var that = this;
+    entity.children.forEach(function(c) {
+        User.findOne({ uid: c }, function(err, child) {
+            if (child) that.children.push( new userTree(child));
+        });
+    });
+};
+
+// construct a tree starting from the asker / granter
+var getEntityTree = function(granter, fn) {
+    if (!v.validate(granter, userValidationSchema).errors.length) {
+        var tree = new userTree(granter);
+        fn(true, tree);
+    }
+    else fn(false, 'Request format is wrong');
+};
+exports.getEntityTree = getEntityTree;
 
 // Deprecated, do not use this
 var findByUuid = function(u, fn) {

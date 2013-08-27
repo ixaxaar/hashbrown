@@ -1,23 +1,29 @@
 
-var mongoose = require('mongoose')
-    , Schema = mongoose.Schema
+var goose = require('mongoose')
+    , Schema = goose.Schema
     , ObjectId = Schema.ObjectId;
 
-var memcached = require('memcached');
+// the local database storing organization schemas
+var settingsdb = 'mongodb://localhost/teams';
+var mongoose = goose.createConnection(settingsdb);
+
+
 var path = require('path');
 var uuid = require('node-uuid');
 
 // json schema validation - for request jsons
 var validation = require('./validation')
     , v = validation.validator
+    , userValidationSchema = validation.userValidationSchema
     , createTeamSchema = validation.createTeamSchema
     , addUserSchema = validation.addUserSchema
+    , teamValidationSchema = validation.teamValidationSchema
     , godCreatesAnOrgSchema = validation.godCreatesAnOrgSchema;
 
 var entity = require('./entity');
+var mordor = require('./ODNSWIM')
+    , permissions = mordor.Permission;
 
-// the local database storing organization schemas
-var settingsdb = 'mongodb://localhost/winterfell';
 
 // Array Remove - By John Resig (MIT Licensed)
 Array.prototype.remove = function(from, to) {
@@ -31,6 +37,7 @@ Array.prototype.remove = function(from, to) {
 ////////////////////////////////
 
 // stores all data of all the database connections
+// todo: can we centralize this into redis?
 var ConnectionMgr = function() {
     this.connections = {};
 };
@@ -43,9 +50,11 @@ ConnectionMgr.prototype.setConnection = function(conn, connectionString){
     return this.connections[connectionString] = conn;
 };
 
-ConnectionMgr.prototype.clearConnection = function(connectionString){
-    return this.connections[connectionString] = undefined;
-};
+// never do this, as mutiple entities can refer to this connection
+// delete one and cause errors everywhere!
+//ConnectionMgr.prototype.clearConnection = function(connectionString){
+//    return this.connections[connectionString] = undefined;
+//};
 
 var ConnMgr = new ConnectionMgr();
 
@@ -74,64 +83,70 @@ TeamSchema.virtual('connectionString')
         return (this.dbConnection + '/' + this.dbName);
     });
 
-TeamSchema.methods.CreateTeam = function (conn, user, name, dbConnection, dbName, parent, org, fn) {
+TeamSchema.methods.CreateTeam = function (conn, granter, name, dbConnection, dbName, parent, fn) {
     var that = this;
     var Team = conn.model("TeamSchema", TeamSchema);
 
-    this.model("TeamSchema").findOne({ "name": name }, function(err, t) {
-        if (!t) {
-            var ret = null;
-            name ? that.name = name : ret = 'name missing';
-            user ? that.owner = user.uid : ret = 'user missing';
-            dbConnection ? that.dbConnection = dbConnection : ret = 'dbConnection missing';
-            dbName ? that.dbName = dbName : ret = 'dbName missing';
-            that.orgName = org.name;
+    if (!v.validate(granter, userValidationSchema).errors.length) {
+        // see if the team already exists
+        that.model("TeamSchema").findOne({ "name": name }, function(err, t) {
+            if (!t) {
+                var ret = null;
+                name ? that.name = name : ret = 'name missing';
+                granter ? that.owner = granter.uid : ret = 'user missing';
+                dbConnection ? that.dbConnection = dbConnection : ret = 'dbConnection missing';
+                dbName ? that.dbName = dbName : ret = 'dbName missing';
+                that.orgName = granter.org;
 
-            // add the tree references
-            if (parent) {
-                if (!that.model("TeamSchema").findOne({ "name": parent },
-                    function(err, p) {
-                        if (!err && p) {
-                            p.children.push(name);
-                            return p.save(function(err) {
-                                if (err) return true;
-                                else return false;
-                            })
-                        }
-                        else return false;
-                })) {
-                    ret = 'Could not find parent';
+                // add the tree references
+                if (parent) {
+                    if (!that.model("TeamSchema").findOne({ "name": parent },
+                        function(err, p) {
+                            if (!err && p) {
+                                p.children.push(name);
+                                return p.save(function(err) { return !!err; });
+                            }
+                            else return false;
+                        })) {
+                        ret = 'Could not find parent';
+                    }
                 }
+
+                if (!ret) that.save(function(err, st) {
+                    if (!err && st) {
+                        fn(null, st);
+                    }
+                    else fn('Could not save team', null);
+                });
+                else fn(ret, null);
+            } else {
+                console.log(err);
+                fn('Team by the same name already exists', null);
             }
-            console.log(that)
-            if (!ret) that.save(function(err, st) {
-                if (!err && st) {
-                    fn(null, st);
-                }
-                else fn('Could not save team', null);
-            });
-            else fn(ret, null);
-        } else {
-            console.log(err);
-            fn('Team by the same name already exists', null);
-        }
-    });
+        });
+    }
+    else fn('Request format is wrong', null);
 };
 
+// not to be used directly
 TeamSchema.methods.Connect = function(fn) {
     var cstring = this.connnectionString;
+    var exist = ConnMgr.getConnection(cstring);
 
-    if (cstring && !ConnMgr.getConnection(cstring)) {
+    if (cstring && !exist) {
         var conn = mongoose.createConnection(cstring);
         // save connection instance
         Connmgr.setConnection(conn, cstring);
         return fn(null, conn);
-    } else return fn('Could not connect', null);
+    }
+    // connection already exists, return that
+    else if (exist) return fn(null, exist);
+    else return fn('Could not connect', null);
 };
 
+// not to be used directly
 TeamSchema.methods.Disconnect = function(fn) {
     ConnMgr.getConnection(this.connectionString).close();
-    ConnMgr.clearConnection(this.connectionString);
     return fn(true);
 };
 
@@ -141,38 +156,42 @@ TeamSchema.methods.Destroy = function(fn) {
     this.delete(fn);
 };
 
-TeamSchema.methods.GetConnection = function() {
-    return ConnMgr.getConnection(this.connectionString);
-};
-
 TeamSchema.methods.addUser = function(user, fn) {
-    this.users.push(user.uid);
+    if (!v.validate(user, userValidationSchema).errors.length) {
 
-    var that = this;
-    entity.addtoTeam(user, this.connectionString, function(err) {
-        that.save(function(err, sthat) {
-            if (!err) fn(null, sthat);
-            else fn('Could not add team to user');
+        var that = this;
+        entity.addtoTeam(user, this.connectionString, function(err, u) {
+
+            that.users.push(u.uid);
+            that.save(function(err, sthat) {
+                if (!err && sthat) fn(null, sthat);
+                else fn('Could not add team to user');
+            });
         });
-    });
+    }
+    else fn('Request format is wrong', null);
 };
 
 TeamSchema.methods.RemoveUser = function(user, fn) {
-    var ctr = 0;
-    var that = this;
+    if (!v.validate(user, userValidationSchema).errors.length) {
+        var ctr = 0;
+        var that = this;
+        var removed = false;
 
-    this.users.forEach(function(u) {
-        if (u == user.uid) {
-
-            that.users.remove(ctr);
-            entity.removeFromTeam(user, this.connection, function(err) {
-                if (!err) fn(null, this);
-                else fn('Could not add team to user');
-            });
-        }
-        ctr++;
-    });
-    // note: point of inconsistence, callback might not necessarily be called
+        this.users.forEach(function(u) {
+            if (u == user.uid) {
+                that.users.remove(ctr);
+                entity.removeFromTeam(user, this.connection, function(err) {
+                    if (!err) fn(null, this);
+                    else fn('Could not remove user from team');
+                    removed = true; // so that fn will not be called again
+                });
+            }
+            ctr++;
+        });
+        if (!removed) fn('Could not find user in this team', null);
+    }
+    else fn('Request format is wrong', null);
 };
 
 
@@ -186,8 +205,7 @@ var OrganizationSchema = new Schema({
     name: String,
     dbConnection: String,
     dbName: { type: String, default: uuid.v4() },
-    teams: [String],
-    rootNodes: [String] // specifically for tree searching
+    teams: [String]
 });
 OrganizationSchema.index({ name: 1 });
 
@@ -196,14 +214,12 @@ OrganizationSchema.virtual('connectionString')
         return (this.dbConnection + this.dbName);
     });
 
-// locally this structure maintains the
-// status of team-level db connections' status
-var connections = [];
-
 // this has to be inside cause every schema is mapped to its mongoose connection
 OrganizationSchema.methods.Connect = function(fn) {
+    var exist = ConnMgr.getConnection(this.connectionString);
+
     // create a connection to this organization's database
-    if (this.connectionString && !ConnMgr.getConnection(this.connectionString)) {
+    if (this.connectionString && !conn) {
         console.log(this.connectionString)
         var conn = mongoose.createConnection(this.connectionString);
         // save the connection instance
@@ -212,13 +228,15 @@ OrganizationSchema.methods.Connect = function(fn) {
         // todo: now connect to all team databases
 
         return (fn) && fn(null, conn);
-    } else return (fn) && fn('Already connected?');
+    }
+    // connection already exists, return that
+    else if (exist) return fn(null, exist);
+    else return (fn) && fn('Already connected?');
 };
 
 OrganizationSchema.methods.Disconnect = function(fn) {
     if (this.connectionString && ConnMgr.getConnection(this.connectionString)) {
         ConnMgr.getConnection(this.connectionString).close();
-        ConnMgr.clearConnection(this.connectionString);
         fn(null);
     } else fn('Connection is already closed');
 };
@@ -226,55 +244,59 @@ OrganizationSchema.methods.Disconnect = function(fn) {
 OrganizationSchema.methods.Create = function(user, name, dbConnection, dbName, fn) {
     var that = this;
 
-    Organization.findOne( {name: name}, function(err, org) {
-        if (!org) {
-            var ret = null;
-            (name) ? that.name = name : ret = 'name missing';
-            (user) ? that.owner = name : ret = 'user is missing';
-            (dbConnection) ? that.dbConnection = dbConnection : ret = 'dbConnection missing';
-            (dbName) ? that.dbName = dbName :  ret = 'dbName missing';
-            if (!ret) that.save(function(err, newo) {
-                if (!err) { fn(null, newo); }
-                else fn(err.message);
-            });
-            else fn(ret, null);
-        }
-        else fn('Organization exists');
-    });
-};
-
-OrganizationSchema.methods.CreateTeam = function(user, name, dbConnection, dbName, parent, fn) {
-    var conn = ConnMgr.getConnection(this.connectionString);
-    var that = this;
-    if (conn) {
-        // get a mongoose model instance corresponding
-        // to this organization's connection
-        var Team = conn.model("TeamSchema", TeamSchema);
-
-        // create a new team structure
-        var team = new Team({});
-        team.CreateTeam(conn, user, name, dbConnection, dbName, parent, this, function(err, t) {
-            if (!err && t) {
-                that.teams.push(t.name);
-                // no parent specified, this team qualifies as a root node
-                if (!parent) that.rootNodes.push(t.name);
-                // connect to the team's database
-                t.Connect(function(err) {
-                    // now the org's data can be updated
-                    that.save(function (err) { if (err) fn(err.message);
-                                                        else fn(null, t); });
-                    if (err) console.log("Could not connect, probably same DB");
+    if (!v.validate(user, userValidationSchema).errors.length) {
+        Organization.findOne( {name: name}, function(err, org) {
+            if (!org) {
+                var ret = null;
+                (name) ? that.name = name : ret = 'name missing';
+                (user) ? that.owner = name : ret = 'user is missing';
+                (dbConnection) ? that.dbConnection = dbConnection : ret = 'dbConnection missing';
+                (dbName) ? that.dbName = dbName :  ret = 'dbName missing';
+                if (!ret) that.save(function(err, newo) {
+                    if (!err) { fn(null, newo); }
+                    else fn(err.message);
                 });
+                else fn(ret, null);
             }
-            else fn(err, null);
+            else fn('Organization exists');
         });
     }
-    else fn('Organizaion is not connected', null);
+    else fn('Request format is wrong');
+};
+
+OrganizationSchema.methods.CreateTeam = function(granter, name, dbConnection, dbName, parent, fn) {
+    var conn = ConnMgr.getConnection(this.connectionString);
+    var that = this;
+
+    if (!v.validate(granter, userValidationSchema).errors.length) {
+        if (conn) {
+            // get a mongoose model instance corresponding
+            // to this organization's connection
+            var Team = conn.model("TeamSchema", TeamSchema);
+
+            // create a new team structure
+            var team = new Team({});
+            team.CreateTeam(conn, granter, name, dbConnection, dbName, parent, function(err, t) {
+                if (!err && t) {
+                    that.teams.push(t.name);
+                    // connect to the team's database
+                    t.Connect(function(err) {
+                        // now the org's data can be updated
+                        if (!err) that.save(function (err) { if (err) fn(err.message);
+                                                    else fn(null, t); });
+                        else fn('Could not connect to database', null);
+                    });
+                }
+                else fn(err, null);
+            });
+        }
+        else fn('Organizaion is not connected', null);
+    }
+    else fn('Request format is wrong');
 };
 
 OrganizationSchema.methods.Destroy = function() {
-    var conn = ConnMgr.getConnection(this.connectionString);
-    this.Disconnect(conn);
+    this.Disconnect();
     this.delete(fn);
 };
 
@@ -292,61 +314,31 @@ OrganizationSchema.methods.FindTeam = function(teamName, fn) {
 // Tree Creator
 ////////////////////////
 
-var node = function(name) {
-    this.name =  name;
-    this.children = {};
-};
+var teamTree = function(team, org) {
+    this.owner = team.owner;
+    this.name = team.name;
+    this.databaseConnection = team.dbConnection;
+    this.databaseName = team.dbName;
+    this.users = team.users;
 
-// todo: re-check this when sane
-var recurseTree = function(conn, tree, root, fn) {
-    root.children.forEach(function(c) {
-        conn.findOne({ name: c }, function(err, child) {
-            // the third criteria is to detect and avoid recursive associations
-            if (!err && child && !child.children[root.name]) {
-                var childNode = new node(child.name);
-                if (child.children.length) recurseTree(conn, childNode, child);
-                tree.children.push(childNode);
-            }
+    this.children = [];
+
+    var Team = ConnMgr.getConnection(org.connectionString).model("TeamSchema", TeamSchema);
+    var that = this;
+    team.children.forEach(function(c) {
+        Team.findOne({ name: c }, function(err, child) {
+            if (child) that.children.push( new teamTree(child, org));
         });
     });
-    fn(tree);
 };
 
-OrganizationSchema.methods.TeamTree = function(fn) {
-    var response = {};
-
-    // get this org's database connection
-    var conn = ConnMgr.getConnection(this.connectionString);
-    var Team = conn.goose.model("TeamSchema", TeamSchema);
-
-    var error = null;
-
-    var rootNode = new node({});
-
-    if (conn) {
-        // create the org node
-        root.name = this.name;
-
-        // for each root node, find its children
-        this.rootNodes.forEach(function(r) {
-            Team.findOne({ name: r }, function(err, root) {
-                if (!err && root) {
-                    // add all the root nodes
-                    rootNode.children.push(new node({ name: root.name }));
-                    var thisTree = rootNode.children;
-                    recurseTree(Team, thisTree, root, function(tree) {
-                        if (!tree) error = true;
-                    });
-                }
-                else console.log('Could not find team, database might need cleaning');
-            });
-        });
-    }
-
-    if (!error) fn(null, rootNode);
-    else fn('Error occured while constructing tree');
+OrganizationSchema.methods.TeamTree = function(teamName, fn) {
+    var Team = ConnMgr.getConnection(org.connectionString).model("TeamSchema", TeamSchema);
+    Team.findOne({ name: teamName }, function(err, t) {
+        if (!err && t) fn(null, new teamTree(t, this));
+        else fn('Could not find team', null);
+    });
 };
-
 
 var Organization = mongoose.model("OrganizationSchema", OrganizationSchema);
 Organization.ensureIndexes( function(err) { if (err) console.log("ensureInedxes failed") } );
@@ -363,11 +355,9 @@ exports.FindOrganization = findOrganization;
 ////////////////////////////////
 
 var verify = function(user, entity, fn) {
-    var mordor = require('./ODNSWIM');
-
     // only if you're a manager or higher and you own the resource, you can make changes
     // P.S. team owners have to be specified manually after team's creation
-    if ((mordor.Permission.hasAdminPermission(user, mordor.Permission.mgr)) &&
+    if ((permissions.hasAdminPermission(user, mordor.Permission.mgr)) &&
         (entity.owner == user))
         fn(true);
 
@@ -412,7 +402,6 @@ var result = function(uuid, type, msg, outcome){
  * json body structure:
  * Input:
  * {
- *  org: String,
  *  parent: String,
  *  name: String,
  *  dbName: String,
@@ -429,7 +418,7 @@ var result = function(uuid, type, msg, outcome){
  */
 var createTeam = function(user, json, fn) {
     if (!v.validate(json, createTeamSchema).errors.length) {
-        Organization.findOne({ name: json.org }, function(err, org) {
+        Organization.findOne({ name: user.org }, function(err, org) {
             if (!err && org) {
                 verify(user, org, function(err) {
                     if (!err) {
@@ -556,6 +545,4 @@ var teamConstructor = function() {
     })
 };
 exports.team = teamConstructor;
-
-
 

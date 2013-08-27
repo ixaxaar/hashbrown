@@ -151,6 +151,15 @@ UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) 
     });
 };
 
+serPermissionSchema.methods.getPermission = function(granter, user, kingdom, fn) {
+    Permission.hasGreaterPermission(granter, user, function(err) {
+        // this functionality is available to the granter as well as the user
+        if (!err || granter.uid === user.uid) {
+            return user.perm[0].perm[kingdom.perm[0].permEntry] = perm;
+        } else fn("Does not have authority see permission.", null);
+    });
+};
+
 // function having the sole authority to revoke user's permissions
 UserPermissionSchema.methods.revoke = function(granter, user, kingdom, perm, fn) {
     Permission.hasGreaterPermission(granter, user, function(err) {
