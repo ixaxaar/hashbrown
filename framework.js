@@ -16,6 +16,8 @@ exports.findUserbyuid = entity.findByUsername;
 exports.validator = validation.validator;
 exports.userValidationSchema = validation.userValidationSchema;
 exports.teamValidationSchema = validation.teamValidationSchema;
+exports.requestValidatorSchema = validation.requestValidatorSchema;
+exports.resultConstructorValidatorSchema = validation.resultConstructorValidatorSchema;
 
 // mordor's exports
 exports.permissions = mordor.Permission;

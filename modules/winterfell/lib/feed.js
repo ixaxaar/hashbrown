@@ -187,11 +187,11 @@ FeedSchema.methods.Delete = function(fn) {
  }
  Output:
  {
-    "uuid": ""              // uuid of this child post
+    "uid": ""              // uuid of this child post
  }
  */
 FeedSchema.methods.AddChild = function(user, json, fn) {
-    if (!v.validate(json, createFeedSchema).errors.length) {
+    if (!v.validate(json, addChildSchema).errors.length) {
         var c = new ChildFeed({});
         c.owner = user.uid;
         c.created = Date.now();
@@ -215,13 +215,24 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
         this.children.push(c);
         this.modified = Date.now();
         this.save(function(err, f) {
-            if (!err || f) fn(null, { "uuid": _.last(f.children).uuid });
+            if (!err || f) fn(null, { "uid": _.last(f.children).uid });
             else fn('Could not add child feed', null);
         });
     }
     else fn('Request format is wrong');
 };
 
+/** JSON request structure:
+ {
+     "uuid": ""            // uuid of the main post
+     "content": "",        // markdown
+     "mentions": [],        // array of mentions (optional)
+ }
+ Output:
+ {
+    "uuid": ""              // uuid of this child post
+ }
+ */
 FeedSchema.methods.removeChild = function(uuid, fn) {
     var ctr = 0;
     var done = false;
@@ -269,33 +280,38 @@ var verify = function(requestor, resource) {
 };
 
 
+var validation = require('./validation')
+    , validate = validation.validator
+    , requestValidatorSchema = validation.requestValidatorSchema
+    , resultConstructorValidatorSchema = validation.resultConstructorValidatorSchema;
 
 var RequestRouter = function(req, res, next) {
-    if (req.body)
-    switch(req.body.request) {
-        case 'newfeed':
-            var F = new Feed({});
-            F.CreateFeed(req.user, req.body.body, function(err, f) {
-                if (!err) res.send(f);
-                else res.send(err);
-            });
-            break;
-
-        case 'newchildfeed':
-            if (req.body && req.body.body && req.body.body.teams.length)
-            Feed.findOne({ "tags.name": req.body.body.teams[0],  "uuid": req.body.body.uuid },
-                function(err, f) {
-                    if (f) f.AddChild(req.user, req.body.body, function(err, af) {
-                        if (!err) res.send(af);
-                        else res.send(err);
-                    });
+    if (validate(req.body, requestValidatorSchema))
+        switch(req.body.request) {
+            case 'newfeed':
+                var F = new Feed({});
+                F.CreateFeed(req.user, req.body.body, function(err, f) {
+                    if (!err) res.send(f);
                     else res.send(err);
                 });
-            break;
+                break;
 
-        case 'deletefeed':
-            //
-    }
+            case 'newchildfeed':
+                if (req.body && req.body.body && req.body.body.teams.length)
+                Feed.findOne({ "tags.name": req.body.body.teams[0],  "uuid": req.body.body.uuid },
+                    function(err, f) {
+                        if (f) f.AddChild(req.user, req.body.body, function(err, af) {
+                            if (!err) res.send(af);
+                            else res.send(err);
+                        });
+                        else res.send(err);
+                    });
+                break;
+
+            case 'deletefeed':
+
+        }
+    else fn
 };
 
 module.exports = RequestRouter;

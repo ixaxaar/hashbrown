@@ -3,6 +3,12 @@
 var Validator = require('jsonschema').Validator;
 var v = new Validator();
 
+var framework = require('../../../framework');
+
+// for the requests and responses, we reuse the framework's request-response structure
+exports.requestValidatorSchema = framework.requestValidatorSchema;
+exports.resultConstructorValidatorSchema = framework.resultConstructorValidatorSchema;
+
 
 var createFeedSchema = {
     "id": "/createFeedSchema",
@@ -47,3 +53,9 @@ v.addSchema(addChildSchema, '/addChildSchema');
 exports.addChildSchema = addChildSchema;
 
 
+
+
+exports.validator = v;
+exports.validate = function(object, schema) {
+    return !v.validate(object, schema).errors.length;
+};
