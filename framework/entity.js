@@ -714,7 +714,3 @@ var entityConstructor = function() {
 };
 exports.entity = entityConstructor;
 
-// som eof the functions that might be useful when the GUI is up
-//ListAllUsersWithThisParent(granter)
-//FindUser()
-//SeeOrgStructure()

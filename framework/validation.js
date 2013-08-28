@@ -220,6 +220,14 @@ var godCreatesAnOrgSchema  = {
     }
 };
 
+var changeTeamOwnerValidationSchema = {
+    "id": "/changeTeamOwnerValidationSchema",
+    "type": "object",
+    "properties": {
+        "name": { "type": "string" },
+        "team": { "type": "string" }
+    }
+};
 
 var teamValidationSchema = {
     "id": "/teamValidationSchema",
@@ -242,11 +250,14 @@ var teamValidationSchema = {
     }
 };
 
+
+v.addSchema(changeTeamOwnerValidationSchema, '/changeTeamOwnerValidationSchema');
 v.addSchema(teamValidationSchema, '/teamValidationSchema');
 v.addSchema(createTeamSchema, '/createTeamSchema');
 v.addSchema(addUserSchema, '/addUserSchema');
 v.addSchema(godCreatesAnOrgSchema, '/godCreatesAnOrgSchema');
 
+exports.changeTeamOwnerValidationSchema = changeTeamOwnerValidationSchema;
 exports.createTeamSchema = createTeamSchema;
 exports.addUserSchema = addUserSchema;
 exports.godCreatesAnOrgSchema = godCreatesAnOrgSchema;
