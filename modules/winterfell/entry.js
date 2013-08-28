@@ -4,25 +4,22 @@
  * Time: 9:22 PM
  */
 
-var mordor = require('.././ODNSWIM');
+var framework = require('../../framework');
 
-var validateAccess = function(req, res, next) {
-
-};
-
+var express = require('express');
+var app = express();
 
 //Configure this module's framework:
 //each app.get can define handlers for GET requests handled
 //by each sub-module
 module.exports = function () {
-    var express = require('express');
-    var app = express();
+    // the POST routes
+    app.post(/.*/, checkCredentials, require("./lib"));
 
-    app.get(/.*/, function (req, res) {
-        res.send(req.path);
-    });
+    // any intermediate GET routes go here
 
-    app.post(/.*/, require("./lib/feed"));
+    // for everything else
+    app.all("*", function(req, res) { return res.send(404); });
 
     return app;
 }();

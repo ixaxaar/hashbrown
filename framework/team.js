@@ -355,8 +355,12 @@ Organization.ensureIndexes( function(err) { if (err) console.log("ensureInedxes 
 var findOrganization = function(name, fn) {
     Organization.findOne({"name": name }, fn);
 };
-exports.FindOrganization = findOrganization;
-
+exports.findOrganization = findOrganization;
+exports.findTeam = function(name, org, fn) {
+    exports.findOrganization(org, function(err, o) {
+        o.findTeam(name, fn);
+    })
+};
 
 ////////////////////////////////
 //   Permission Verification for

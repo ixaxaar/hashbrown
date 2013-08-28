@@ -46,4 +46,7 @@ exports.getAPI = realm.getAPI;
 
 
 // team's exports
+exports.findOrganization = team.findOrganization;
+exports.findTeam = team.findTeam;
+exports.getConnection = team.GetConnection;
 

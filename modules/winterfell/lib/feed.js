@@ -3,22 +3,35 @@
 var mongoose = require('mongoose')
     , Schema = mongoose.Schema
     , ObjectId = Schema.ObjectId;
+
 var uuid = require('node-uuid');
 
 var _ = require('underscore');
 
-// json schema validation - for request jsons
-var Validator = require('jsonschema').Validator;
-var v = new Validator();
-
 var history = require('./history');
-var framework = require('../../../framework');
+var framework = require('../../../framework'),
+    permissions = framework.permissions;
+
+
+////////////////////////////////
+//   Utilities
+////////////////////////////////
 
 // Array Remove - By John Resig (MIT Licensed)
 Array.prototype.remove = function(from, to) {
     var rest = this.slice((to || from) + 1 || this.length);
     this.length = from < 0 ? this.length + from : from;
     return this.push.apply(this, rest);
+};
+
+var getTeamDBConnection = function(team, user, fn) {
+    // check if the user is a member of the team
+    if (_.indexOf(user.teams, name) != -1)
+        framework.findTeam(name, user.org, fn);
+    else if (permissions.hasAdminPermission(user, permissions.admin))
+        framework.findTeam(name, user.org, fn);
+    else
+        fn('User is not part of the requested team');
 };
 
 /////////////////////////////////////////////
@@ -52,7 +65,6 @@ var ChildFeedSchema = new Schema({
 });
 // note: now this, sir, is gonna be costly.. todo: verify index impact on RAM
 ChildFeedSchema.index({ owner: 1, updated: -1 });
-
 var ChildFeed = mongoose.model("ChildFeedSchema", ChildFeedSchema);
 
 // a one-field schema for now, maybe will be expanded later
@@ -84,7 +96,7 @@ var FeedSchema = new Schema({
 FeedSchema.index({ owner: 1, updated: -1 });
 FeedSchema.index({ teams: 1 });
 
-// add histopry support for these feeds
+// add history support for these feeds
 history(FeedSchema);
 
 /** JSON request structure:
@@ -105,35 +117,8 @@ history(FeedSchema);
     "uuid" : ""            // uuid of the new post
  }
  */
-var createFeedSchema = {
-    "id": "/createFeedSchema",
-    "type": "object",
-    "properties": {
-        "content": { "type": "string", "required": true },
-        "file": { "type": "string" }, //todo:  should we make it mandatory to upload files as well?
-        "name": { "type": "string" },
-        "location": { "type": "string" },
-        "belongs": {
-            "type": "array",
-            "items": "string"
-        },
-        "mentions": {
-            "type": "array",
-            "items": "string"
-        }
-    },
-    "private": { "type": "string" },
-    "tags": {
-        "type": "array",
-        "items": "string"
-    },
-    "versioned": { "type": "boolean" }
-};
-v.addSchema(createFeedSchema, '/createFeedSchema');
-
 FeedSchema.methods.CreateFeed = function(user, json, fn) {
     if (!v.validate(json, createFeedSchema).errors.length) {
-        this.created = Date.now();
         this.owner = user.uid;
         this.children = [];
 
@@ -205,18 +190,6 @@ FeedSchema.methods.Delete = function(fn) {
     "uuid": ""              // uuid of this child post
  }
  */
-var addChildSchema = {
-    "id": "/createFeedSchema",
-    "type": "object",
-    "properties": {
-        "uuid": { "type": "string", "required": "true" },
-        "content": { "type": "string", "required": "true" },
-        "mentions": {
-            "type": "array",
-            "items": "string"
-        }
-    }
-};
 FeedSchema.methods.AddChild = function(user, json, fn) {
     if (!v.validate(json, createFeedSchema).errors.length) {
         var c = new ChildFeed({});
@@ -232,7 +205,7 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
         if (json.mentions) json.mentions.forEach(function(m) {
             // make sure this query is covered
             user.model("UserSchema").findOne({ uid: m }, { uid: 1 }, function(err, u) {
-                // we add the mentions in each sub-post to the main pot:
+                // we add the mentions in each sub-post to the main post:
                 // afa security is concerned, this implies a friend-of-friend kind
                 // of open-ness facilitating inter-team discussions
                 if (!err && u) that.acl.push(u.uid);
@@ -251,14 +224,16 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
 
 FeedSchema.methods.removeChild = function(uuid, fn) {
     var ctr = 0;
+    var done = false;
     this.children.forEach(function(c) {
         if (c.uuid == uuid) {
+            done = true;
             fn(null, c.remove(ctr));
         }
         ctr++;
     });
 
-    if (ctr == this.children.length) fn('Could not find child', null);
+    if (!done) fn('Could not find child', null);
 };
 
 var Feed = mongoose.model("FeedSchema", FeedSchema);
@@ -316,30 +291,13 @@ var RequestRouter = function(req, res, next) {
                     });
                     else res.send(err);
                 });
+            break;
 
+        case 'deletefeed':
+            //
     }
 };
 
 module.exports = RequestRouter;
 
 
-// todo: implement caching in memcached
-
-////////////////////////////////
-//   Feed Stack Schema
-////////////////////////////////
-
-// the stack of feeds constructed for each user
-// one stack per user 
-var FeedStackSchema = new Schema({
-    owner: String, // the _id of the user
-    recentStack: [FeedSchema], // the more recent and probably cached part of stack
-    archiveStack: String // the archived part of the stack
-});
-
-FeedStackSchema.methods.Push = function(feed) {
-    this.recentStack.push(feed);
-    this.CompactAndSave(); // save after compacting / archiving
-};
-
-var FeedStack = mongoose.model("FeedStackSchema", FeedStackSchema);
