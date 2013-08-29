@@ -168,8 +168,8 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
 
         // commit to DB
         this.save(function(err, t) {
-            if (!err || t) fn(null, { "uuid": t.uuid });
-            else fn('Could not save', null);
+            if (!err || t) fn(true, { "uuid": t.uuid });
+            else fn(false, 'Could not save');
         });
     }
     else fn('Request format is wrong');
@@ -187,7 +187,7 @@ FeedSchema.methods.Delete = function(fn) {
  }
  Output:
  {
-    "uid": ""              // uuid of this child post
+    "uuid": ""              // uuid of this child post
  }
  */
 FeedSchema.methods.AddChild = function(user, json, fn) {
@@ -215,7 +215,7 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
         this.children.push(c);
         this.modified = Date.now();
         this.save(function(err, f) {
-            if (!err || f) fn(null, { "uid": _.last(f.children).uid });
+            if (!err || f) fn(null, { "uuid": c.uuid });
             else fn('Could not add child feed', null);
         });
     }
@@ -225,8 +225,6 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
 /** JSON request structure:
  {
      "uuid": ""            // uuid of the main post
-     "content": "",        // markdown
-     "mentions": [],        // array of mentions (optional)
  }
  Output:
  {
@@ -248,20 +246,40 @@ FeedSchema.methods.removeChild = function(uuid, fn) {
 };
 
 var Feed = mongoose.model("FeedSchema", FeedSchema);
-//exports.Feed = Feed;
+exports.Feed = Feed;
 
 // build indexes
-Feed.ensureIndexes(function(err, obj) { if (err) console.log('Could not ensure index'); });
+Feed.ensureIndexes(function(err) { if (err) console.log('Could not ensure index'); });
+
 
 // fucking costly function (unless feed is cached), avoid as much as possible
-var findFeed = function(uuid, fn) {
-    // todo: return the cached one if present
-    Feed.find({ uuid: uuid }, function(err, f) {
-        if (!err || f) fn(null, f);
-        else fn('Could not find feed', null);
-    });
+var findFeed = function(asker, uuid, fn) {
+    var found = true;
+
+    // see if this feed belongs to the asker himself
+    // this kind of queries is more probable and we can serve
+    // it in lesser time as 'owner' is indexed
+    Feed.find({})
+    .where('owner').equals(asker.uid)
+    .where('uuid').equals(uuid)
+    .exec(function(err, f) {
+            if (!err && f) {
+                fn(null, f);
+                found = true;
+            }
+        });
+
+    // fall-back to thew brute-force way
+    if (!found) Feed.find({})
+        .where('uuid').equals(uuid)
+        .exec(function(err, f) {
+            if (!err && f) {
+                fn(null, f);
+                found = true;
+            } else fn('Could not find feed');
+        });
 };
-exports.FindFeed = findFeed;
+exports.findFeed = findFeed;
 
 ////////////////////////////////////////
 //      Permissions
@@ -285,33 +303,43 @@ var validation = require('./validation')
     , requestValidatorSchema = validation.requestValidatorSchema
     , resultConstructorValidatorSchema = validation.resultConstructorValidatorSchema;
 
-var RequestRouter = function(req, res, next) {
+var requestRouter = function(req, res, next) {
     if (validate(req.body, requestValidatorSchema))
         switch(req.body.request) {
+
             case 'newfeed':
                 var F = new Feed({});
-                F.CreateFeed(req.user, req.body.body, function(err, f) {
-                    if (!err) res.send(f);
-                    else res.send(err);
-                });
+                F.CreateFeed(req.user, req.body.body, respond);
                 break;
 
             case 'newchildfeed':
-                if (req.body && req.body.body && req.body.body.teams.length)
-                Feed.findOne({ "tags.name": req.body.body.teams[0],  "uuid": req.body.body.uuid },
-                    function(err, f) {
-                        if (f) f.AddChild(req.user, req.body.body, function(err, af) {
-                            if (!err) res.send(af);
-                            else res.send(err);
-                        });
-                        else res.send(err);
+                if (req.body.uuid)
+                    Feed.findOne({ uuid: req.body.uuid }, function(err, f) {
+                        if (!err && f) f.AddChild(req.user, req.body.body, respond);
+                        else respond(false, 'Feed not found');
                     });
                 break;
 
             case 'deletefeed':
+                if (req.body.uuid)
+                    Feed.findOne({ uuid: req.body.uuid }, function(err, f) {
+                        if (!err && f) f.Delete(respond);
+                        else respond(false, 'Feed not found');
+                    });
+                break;
 
+            case 'deletechildfeed':
+                if (req.body.uuid)
+                    Feed.findOne({ uuid: req.body.uuid }, function(err, f) {
+                        if (!err && f) f.removeChild(req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                break;
+
+            default:
+                respond(false, 'Request not found');
         }
-    else fn
+    else respond(false, 'Request not found');
 };
 
 module.exports = RequestRouter;
