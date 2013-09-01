@@ -20,7 +20,9 @@
     "jade": "*",
     "marked": "*",
     "jsonschema": "*",
-    "tobi" : "*"
+    "tobi" : "*",
+    "winston": "*",
+    "winston-syslog": "*"
   },
   "devDependencies": {
     "nodemon": "*"

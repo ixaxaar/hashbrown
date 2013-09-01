@@ -19,7 +19,21 @@ var express = require('express')
     , team = require('./framework/team')
     , passport = require('passport')
     , heartbeat = require('./framework/heartbeat')
-    , mordor = require("./framework/ODNSWIM");
+    , mordor = require("./framework/ODNSWIM")
+    , winston = require('winston');
+
+
+// configure logging
+//noinspection BadExpressionStatementJS
+require('winston-syslog').Syslog;
+winston.add(winston.transports.Syslog, options);
+winston.setLevels(winston.config.syslog.levels);
+
+// these logging methods are available throughout the app
+global.log = winston.log;
+
+
+log('info', 'Hashbrown, starting up...');
 
 var app = express();
 // for tobi testing
@@ -32,6 +46,10 @@ app.configure('development', function(){
     app.set('port', process.env.PORT || 3000);
     app.set('views', __dirname + '/views');
     app.set('view engine', 'jade');
+    app.use(function(req, res, next) {
+        log('debug', '%s %s', req.method, req.url);
+        next();
+    });
     app.use(express.favicon());
     app.use(express.logger('dev'));
     app.use(express.bodyParser());

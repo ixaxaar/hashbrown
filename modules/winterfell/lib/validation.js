@@ -9,12 +9,11 @@ var framework = require('../../../framework');
 exports.requestValidatorSchema = framework.requestValidatorSchema;
 exports.resultConstructorValidatorSchema = framework.resultConstructorValidatorSchema;
 
-
 var createFeedSchema = {
     "id": "/createFeedSchema",
     "type": "object",
     "properties": {
-        "content": { "type": "string", "required": true },
+        "content": { "type": "string", "required": "true" },
         "file": { "type": "string" }, //todo:  should we make it mandatory to upload files as well?
         "name": { "type": "string" },
         "location": { "type": "string" },
@@ -32,7 +31,11 @@ var createFeedSchema = {
         "type": "array",
         "items": "string"
     },
-    "versioned": { "type": "boolean" }
+    "versioned": { "type": "boolean" },
+    "associations": {
+        "type": "array",
+        "items": "object"
+    }
 };
 v.addSchema(createFeedSchema, '/createFeedSchema');
 exports.createFeedSchema = createFeedSchema;
@@ -51,9 +54,6 @@ var addChildSchema = {
 };
 v.addSchema(addChildSchema, '/addChildSchema');
 exports.addChildSchema = addChildSchema;
-
-
-
 
 exports.validator = v;
 exports.validate = function(object, schema) {

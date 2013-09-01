@@ -5,13 +5,16 @@ var mongoose = require('mongoose')
     , ObjectId = Schema.ObjectId;
 
 var uuid = require('node-uuid');
-
 var _ = require('underscore');
 
 var history = require('./history');
 var framework = require('../../../framework'),
     permissions = framework.permissions;
 
+var validation = require('./validation')
+    , validate = validation.validator
+    , requestValidatorSchema = validation.requestValidatorSchema
+    , resultConstructorValidatorSchema = validation.resultConstructorValidatorSchema;
 
 ////////////////////////////////
 //   Utilities
@@ -28,6 +31,8 @@ var getTeamDBConnection = function(team, user, fn) {
     // check if the user is a member of the team
     if (_.indexOf(user.teams, name) != -1)
         framework.findTeam(name, user.org, fn);
+
+    // policy: in case of an admin, comply
     else if (permissions.hasAdminPermission(user, permissions.admin))
         framework.findTeam(name, user.org, fn);
     else
@@ -91,7 +96,8 @@ var FeedSchema = new Schema({
     teams: [],
     acl: [String], // @mentions of people
     children: [ChildFeedSchema], // stack of child feeds
-    versioned: { type: Boolean, default: false } // is this versioned?
+    versioned: { type: Boolean, default: false }, // is this versioned?
+    associations: { type: ObjectId } // any associations for other modules
 });
 FeedSchema.index({ owner: 1, updated: -1 });
 FeedSchema.index({ teams: 1 });
@@ -252,7 +258,7 @@ exports.Feed = Feed;
 Feed.ensureIndexes(function(err) { if (err) console.log('Could not ensure index'); });
 
 
-// fucking costly function (unless feed is cached), avoid as much as possible
+// fucking costly function (unless feed is cached)
 var findFeed = function(asker, uuid, fn) {
     var found = true;
 
@@ -296,12 +302,6 @@ var verify = function(requestor, resource) {
     return (requestor.org === resource.org) &&
             (requestor.perm[0].admin >= framework.Permission.admin);
 };
-
-
-var validation = require('./validation')
-    , validate = validation.validator
-    , requestValidatorSchema = validation.requestValidatorSchema
-    , resultConstructorValidatorSchema = validation.resultConstructorValidatorSchema;
 
 var requestRouter = function(req, res, next) {
     if (validate(req.body, requestValidatorSchema))
