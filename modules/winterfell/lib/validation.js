@@ -9,6 +9,10 @@ var framework = require('../../../framework');
 exports.requestValidatorSchema = framework.requestValidatorSchema;
 exports.resultConstructorValidatorSchema = framework.resultConstructorValidatorSchema;
 
+/////////////////////////////////////////
+//        Feed Request Validations
+/////////////////////////////////////////
+
 var createFeedSchema = {
     "id": "/createFeedSchema",
     "type": "object",
@@ -16,6 +20,7 @@ var createFeedSchema = {
         "content": { "type": "string", "required": "true" },
         "file": { "type": "string" }, //todo:  should we make it mandatory to upload files as well?
         "name": { "type": "string" },
+        "mime": { "type": "string" },
         "location": { "type": "string" },
         "belongs": {
             "type": "array",
@@ -55,7 +60,30 @@ var addChildSchema = {
 v.addSchema(addChildSchema, '/addChildSchema');
 exports.addChildSchema = addChildSchema;
 
+var removeChildValidationSchema = {
+    "id": "/removeChildValidationSchema",
+    "type": "object",
+    "properties": {
+        "uuid": { "type": "string", "required": "true" },
+        "childuuid": { "type": "string", "required": "true" }
+    }
+};
+v.addSchema(removeChildValidationSchema, '/removeChildValidationSchema');
+exports.removeChildValidationSchema = removeChildValidationSchema;
+
+var removeFeedValidationSchema = {
+    "id": "/removeFeedValidationSchema",
+    "type": "object",
+    "properties": {
+        "uuid": { "type": "string", "required": "true" }
+    }
+};
+v.addSchema(removeFeedValidationSchema, '/removeFeedValidationSchema');
+exports.removeFeedValidationSchema = removeFeedValidationSchema;
+
 exports.validator = v;
 exports.validate = function(object, schema) {
     return !v.validate(object, schema).errors.length;
 };
+
+

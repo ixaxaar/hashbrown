@@ -19,41 +19,44 @@ var __ContentHistory = mongoose.model("__ContentHistorySchema", __ContentHistory
 
 // maintain the history of previous versions of content
 var ContentHistorySchema = new Schema({
-    name: String, // has to be unique and linked to the main object in some way
+    name: { type: String, default: "" }, // has to be unique and linked to the main object in some way
     versions: [__ContentHistorySchema], // array of pervious version posts
-    hanging: [__ContentHistorySchema], // un-reviewed versions
-    accepts: [__ContentHistorySchema] // history of accepted versions
+    toReview: [__ContentHistorySchema], // un-reviewed versions
+    accepted: [__ContentHistorySchema] // history of accepted versions
 });
 var ContentHistory = mongoose.model("ContentHistorySchema", ContentHistorySchema);
 
 
-// accept a hanging version as a new version
+// accept a toReview version as a new version
 // note: in these methods, the original posts are __not__ removed
-var Accept = function(user, commit, fn) {
-    var history = this.connection.model('ContentHistorySchema');
+var acceptCommit = function(conn, uid, commit, fn) {
+    if (conn && doc && uid && commit) {
+        var history = conn.model('ContentHistorySchema');
 
-    history.find({name: this.content.displayname}, function(err, his) {
-        if (his.length) {
-            if (his[0].hanging.length >= commit) {
-                var rev = his[0].hanging[commit];
-                his[0].hanging.remove(commit);
-                his[0].versions.push(rev);
-                his[0].save(fn);
+        history.find({ name: uid }, function(err, his) {
+            if (his.length) {
+                if (his[0].toReview.length > commit) {
+                    var rev = his[0].toReview[commit];
+                    his[0].toReview.remove(commit);
+                    his[0].versions.push(rev);
+                    his[0].save(fn);
+                }
+                else fn('No history found for this document');
             }
-            else fn('no history found for this document');
-        }
-        else fn('Error fetching history of this document');
-    });
+            else fn('Error fetching history of this document');
+        });
+    }
+    else fn && fn('Insufficient parameters');
 };
 
-// reject a hanging version
-var Reject = function(user, commit, fn) {
+// reject a toReview version
+var rejectCommit = function(user, commit, fn) {
     var history = this.connection.model('ContentHistorySchema');
 
     history.find({name: this.content.displayname}, function(err, his) {
         if (his.length) {
-            if (his[0].hanging.length >= commit) {
-                his[0].hanging.remove(commit);
+            if (his[0].toReview.length >= commit) {
+                his[0].toReview.remove(commit);
                 his[0].save(fn);
             }
             else fn('no history found for this document');
@@ -63,12 +66,12 @@ var Reject = function(user, commit, fn) {
 };
 
 // delete a versioned commit
-var Delete = function(user, commit, fn) {
+var deleteCommit = function(user, commit, fn) {
     var history = this.connection.model('ContentHistorySchema');
 
     history.find({name: this.content.displayname}, function(err, his) {
         if (his.length) {
-            if (his[0].hanging.length >= commit) {
+            if (his[0].toReview.length >= commit) {
                 his[0].versions.remove(commit);
                 his[0].save(fn);
             }
@@ -78,19 +81,19 @@ var Delete = function(user, commit, fn) {
     });
 };
 
-// accept a number of hanging versions and add this as a new version
-var AcceptMerged = function(user, commits, fn) {
+// accept a number of toReview versions and add this as a new version
+var acceptMerged = function(user, commits, fn) {
     var history = this.connection.model('ContentHistorySchema');
     var that = this;
 
     history.find({name: this.content.displayname}, function(err, his) {
         if (his.length) {
-            // delete the hanging comments and push them into accepts
+            // delete the toReview comments and push them into accepted
             commits.forEach(function(c) {
-                if (his[0].hanging.length >= c) {
-                    var rev = his[0].hanging[c];
-                    his[0].hanging.remove(c);
-                    his[0].accepts.push(rev);
+                if (his[0].toReview.length >= c) {
+                    var rev = his[0].toReview[c];
+                    his[0].toReview.remove(c);
+                    his[0].accepted.push(rev);
                 }
             });
             // add this's content as a new version
@@ -102,45 +105,68 @@ var AcceptMerged = function(user, commits, fn) {
     });
 };
 
-var NewCommit = function(doc, fn) {
-    var history = doc.connection.model('ContentHistorySchema');
+var newCommit = function(conn, doc, uid, fn) {
+    if (conn && doc && uid) {
+        var history = conn.model('ContentHistorySchema');
 
-    history.find({name: doc.content.displayname}, function(err, his) {
-        if (!his.length) {
-            var newhistory = new history({});
-            newhistory.name = doc.displayname;
-            newhistory.versions = [new __ContentHistory({ content: doc.uuid })];
-            newhistory.hanging = [];
-            his[0] = newhistory;
-        }
-        else his[0].hanging.push(new __ContentHistory({content: doc.content}));
-
-        his[0].save(fn);
-    });
-};
-
-var PreSave = function(next, done) {
-    // nothing
-};
-
-var PostSave = function(doc){
-    // if the document is versioned, document the recent history
-    if (doc.versioned) {
-        NewCommit(doc, function(err) {
-            console.log('Could not save history: ' + err.message);
+        history.find({ name: uid }, function(err, his) {
+            if (!his.length) {
+                // the history for this document does not exist, create a new one
+                var newhistory = new history({});
+                newhistory.name = uid;
+                // policy: first commit is a new version, not a toReview
+                newhistory.versions = [new __ContentHistory({ content: doc._id })];
+                newhistory.toReview = [];
+                newhistory.save(fn);
+            }
+            else {
+                // okay, so history exists, add this bare commit to toReview
+                his[0].toReview.push(new __ContentHistory({content: doc.content}));
+                his[0].save(fn);
+            }
         });
     }
+    else fn && fn('Insufficient parameters');
+};
+
+//var preSave = function(next, done) {
+//    // nothing
+//};
+//
+//var postSave = function(doc){
+//    // if the document is versioned, document the recent history
+//    if (doc.versioned) {
+//        newCommit(doc, function(err) {
+//            log('err', 'Could not save history: ' + err.message);
+//        });
+//    }
+//};
+
+var history = function(schema) {
+    // add these field to the schema
+    // versioned: indicates whether a document is versioned
+    // versionuuid: indicates points to the document's contentHistory
+    schema.add({ versioned: { type: Boolean, default: (defaultEnabled || false) } });
+    schema.add({ versionuuid: { type: String, default: "" } });
+
+    // add these schema methods
+    schema.methods.addToReview = newCommit;
+    schema.methods.acceptReview = acceptCommit;
+    schema.methods.rejectReview = rejectCommit;
+    schema.methods.mergeCommits = acceptMerged;
+    schema.methods.deleteVersion = deleteCommit;
+
+    // schema middleware: bad idea :(
+//    schema.pre('save', preSave);
+//    schema.post('save', postSave);
+};
+
+// enable versioning for a document
+history.prototype.enableHistory = function(document) {
+    document.versioned = true;
+    document.versionuuid = uuid.v4();
 };
 
 // extend the schemas with history functions
-module.exports = function(schema) {
-    schema.methods.pullCommit = Accept;
-    schema.methods.deleteCommit = Reject;
-    schema.methods.mergeCommits = AcceptMerged;
-    schema.methods.commit = NewCommit;
-    schema.methods.deleteVersion = Delete;
-
-    schema.pre('save', PreSave);
-    schema.post('save', PostSave);
-};
+module.exports = exports = history;
 

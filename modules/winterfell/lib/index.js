@@ -1,13 +1,17 @@
 
+var feed = require('./feed');
 
+var framework = require('../../../framework')
+    , notifyDevelopers = framework.notifyDevelopers
+    , report = framework.heartbeatEnabled;
+
+var validation = require('./validation')
+    , validate = validation.validator
+    , requestValidatorSchema = validation.requestValidatorSchema;
 
 var sendException = function(e, recovery) {
-    // throw all exceptions in a dev environment
-//    if ('development' == parentApp.get('env')) throw e;
-
-    // whatever you do not, throw an exception here
-    if (heartbeat.report) {
-        heartbeat.notifyDevelopers("Error",
+    if (report) {
+        notifyDevelopers("Error",
             "Exception occured while creating god", function() {
                 if ('development' == parentApp.get('env')) throw e;
             });
@@ -17,9 +21,9 @@ var sendException = function(e, recovery) {
     try {
         recovery();
     } catch (e) {
-        console.log("Double exception!");
+        log('crit', "Double exception!");
     }
-    console.log("Exception occured while processing request");
+    log('crit', "Exception occured while processing request");
 };
 
 
@@ -33,7 +37,7 @@ var resultConstructor = function(request, uuid, msg, outcome) {
 var requestResponder = function(req, res, result, msg) {
     var r = new resultConstructor(req.request, req.uuid, result, msg);
 
-    if (!v.validate(r, resultConstructorValidatorSchema).errors.length) {
+    if (validate(r, resultConstructorValidatorSchema)) {
         res.send(r);
     }
     else {
@@ -41,10 +45,62 @@ var requestResponder = function(req, res, result, msg) {
     }
 };
 
+var feedRequestRouter = function(req, res, next) {
+    req.accepts('application/json');
 
+    try {
+        var respond = function(result, msg) {
+            result = !!result;
+            if (!msg) msg = result;
 
-var winterfell = function() {
+            requestResponder(req, res, result, msg);
+        };
 
+        if (validate(req.body, requestValidatorSchema))
+            switch(req.body.request) {
+
+                case 'newfeed':
+                    var F = new feed.Feed({});
+                    F.CreateFeed(req.user, req.body.body, respond);
+                    break;
+
+                case 'newchildfeed':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.AddChild(req.user, req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
+                case 'deletefeed':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.Delete(respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
+                case 'deletechildfeed':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.removeChild(req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
+                default:
+                    respond(false, 'Request not found');
+            }
+        else respond(false, 'Request not found');
+    } catch (e) {
+        sendException(e, function() {
+            respond(false, 'Request format is wrong');
+        });
+    }
 };
 
-module.export = winterfell;
+var winterfell = function(app) {
+    app.post(/\/feed/, feedRequestRouter);
+
+    app.all("*", function(req, res) { res.send(404); });
+};
+
+module.export = exports = winterfell;
+

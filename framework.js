@@ -25,6 +25,7 @@ exports.checkCredentials = mordor.openBlackGate;
 
 // heartbeat's exports
 exports.notifyDevelopers = heartbeat.notifyDevelopers;
+exports.heartbeatEnabled = heartbeat.report;
 
 // minas exports - todo: remove this
 exports.tirith = minas.tirith;
