@@ -74,10 +74,10 @@ UserSchema.index({ org: 1, teams: 1 });
 var GOD = null;
 
 // add an user
-UserSchema.methods.addUser = function(granter, uid, hash, fn) {
+UserSchema.methods.createUser = function(granter, uid, hash, fn) {
     var that = this;
 
-    if (!v.validate(granter, userValidationSchema).errors.length || GOD === null) {
+//    if (GOD === null || !v.validate(granter, userValidationSchema).errors.length) {
         // god is created by nobody, so exempt him,
         // for all other users, the granter must be manager and above
         if ((uid === 'god' && GOD === null)  ||
@@ -117,8 +117,8 @@ UserSchema.methods.addUser = function(granter, uid, hash, fn) {
                 } else fn('User name is taken or missing parameters', null);
             });
         } else fn('Granter does not have permission to add user', null);
-    }
-    else fn('Request format is wrong');
+//    }
+//    else fn('Request format is wrong');
 };
 
 // delete a user
@@ -372,7 +372,7 @@ exports.Kingdom = Kingdom;
 
 var addOrgUser = function(granter, name, orgName, pass, kingdoms, fn) {
     var newOrgUser = new User({});
-    newOrgUser.addUser(granter, name, pass, function(err, org) {
+    newOrgUser.createUser(granter, name, pass, function(err, org) {
         if (!err && org) {
             // assign it an org
             org.org = orgName;
@@ -425,13 +425,13 @@ exports.removeFromTeam = removeFromTeam;
  * }
  *
  */
-addUser = function(granter, json, fn) {
+createUser = function(granter, json, fn) {
     if (!v.validate(granter, userValidationSchema).errors.length &&
         !v.validate(json, addUserValidationSchema).errors.length) {
 
         var u = new User({});
 
-        u.addUser(granter, json.username, json.password, function(err, u) {
+        u.createUser(granter, json.username, json.password, function(err, u) {
             if (err || !u) fn(false, err);
             else
                 u.save(function(err, u) {
@@ -442,7 +442,7 @@ addUser = function(granter, json, fn) {
     }
     else fn(false, 'Request format is wrong');
 };
-exports.addUser = addUser;
+exports.addUser = createUser;
 
 
 /**
@@ -698,15 +698,16 @@ var findByUuid = function(u, fn) {
 exports.findByUuid = findByUuid;
 
 var findByUsername = function(u, fn) {
-    if (u == 'god') return fn(null, GOD);
+    if (u === 'god') return fn(null, GOD);
     else return User.findOne({ uid: u }, fn);
 };
 exports.findByUsername = findByUsername;
 
 var entityConstructor = function() {
     var newuser = new User({});
+    log('info', 'Creating god!');
     // uuid.v4()
-    newuser.addUser(null, 'god', '123', function(err, u) {
+    newuser.createUser(null, 'god', '123', function(err, u) {
         if (err) throw err;
         if (!u) throw 'User object returned is null';
         if (u) GOD = u;

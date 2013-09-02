@@ -14,6 +14,7 @@ var uuid = require('node-uuid');
 // json schema validation - for request jsons
 var validation = require('./validation')
     , v = validation.validator
+    , validate = validation.validate
     , userValidationSchema = validation.userValidationSchema
     , createTeamSchema = validation.createTeamSchema
     , addUserSchema = validation.addUserSchema
@@ -88,7 +89,7 @@ TeamSchema.methods.createTeam = function (conn, granter, name, dbConnection, dbN
     var that = this;
     var Team = conn.model("TeamSchema", TeamSchema);
 
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
         // see if the team already exists
         that.model("TeamSchema").findOne({ "name": name }, function(err, t) {
             if (!t) {
@@ -158,7 +159,7 @@ TeamSchema.methods.destroy = function(fn) {
 };
 
 TeamSchema.methods.addUser = function(user, fn) {
-    if (!v.validate(user, userValidationSchema).errors.length) {
+    if (validate(user, userValidationSchema)) {
 
         var that = this;
         entity.addtoTeam(user, this.connectionString, function(err, u) {
@@ -174,7 +175,7 @@ TeamSchema.methods.addUser = function(user, fn) {
 };
 
 TeamSchema.methods.setOwner = function(user, fn) {
-    if (!v.validate(user, userValidationSchema).errors.length) {
+    if (validate(user, userValidationSchema)) {
         this.owner = user.uid;
         fn(null, this);
     }
@@ -182,7 +183,7 @@ TeamSchema.methods.setOwner = function(user, fn) {
 };
 
 TeamSchema.methods.removeUser = function(user, fn) {
-    if (!v.validate(user, userValidationSchema).errors.length) {
+    if (validate(user, userValidationSchema)) {
         var ctr = 0;
         var that = this;
         var removed = false;
@@ -253,7 +254,7 @@ OrganizationSchema.methods._disconnect = function(fn) {
 OrganizationSchema.methods.createOrg = function(user, name, dbConnection, dbName, fn) {
     var that = this;
 
-    if (!v.validate(user, userValidationSchema).errors.length) {
+    if (validate(user, userValidationSchema)) {
         Organization.findOne( {name: name}, function(err, org) {
             if (!org) {
                 var ret = null;
@@ -277,7 +278,7 @@ OrganizationSchema.methods.createTeam = function(granter, name, dbConnection, db
     var conn = connMgr.getConnection(this.connectionString);
     var that = this;
 
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
         if (conn) {
             // get a mongoose model instance corresponding
             // to this organization's connection
@@ -429,7 +430,7 @@ var result = function(uuid, type, msg, outcome){
  *
  */
 var createTeam = function(user, json, fn) {
-    if (!v.validate(json, createTeamSchema).errors.length) {
+    if (validate(json, createTeamSchema)) {
         Organization.findOne({ name: user.org }, function(err, org) {
             if (!err && org) {
                 verify(user, org, function(err) {
@@ -470,7 +471,7 @@ exports.createTeam = createTeam;
  *
  */
 var addUser = function(granter, json, fn) {
-    if (!v.validate(json, addUserSchema).errors.length) {
+    if (validate(json, addUserSchema)) {
         findOrganization(granter.org, function(err, org) {
             console.log(granter.org)
             if (!err && org) {
@@ -514,7 +515,7 @@ exports.addUser = addUser;
  */
 
 var changeTeamOwner = function(granter, json, fn) {
-    if (!v.validate(json, changeTeamOwnerValidationSchema).errors.length) {
+    if (validate(json, changeTeamOwnerValidationSchema)) {
         findOrganization(granter.org, function(err, org) {
             if (!err && org) {
                 org.findTeam(json.team, function(err, t) {
@@ -558,7 +559,7 @@ exports.changeTeamOwner = changeTeamOwner;
  *
  */
 var godCreatesAnOrg = function(user, json, fn) {
-    if (!v.validate(json, godCreatesAnOrgSchema).errors.length) {
+    if (validate(json, godCreatesAnOrgSchema)) {
         if (user.uid == 'god') {
             var org = new Organization();
 

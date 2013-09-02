@@ -197,7 +197,7 @@ var getHistory = function(conn, uid, fn) {
 //    }
 //};
 
-var history = function(schema) {
+var history = function(schema, defaultEnabled) {
     // add these field to the schema
     // versioned: indicates whether a document is versioned
     // versionuuid: indicates points to the document's contentHistory

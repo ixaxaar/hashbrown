@@ -9,6 +9,15 @@ var minas = require('./framework/minas');
 var realm = require('./framework/realm');
 var heartbeat = require('./framework/heartbeat');
 
+exports.entity = entity;
+exports.validation = validation;
+exports.mordor = mordor;
+exports.minas = minas;
+exports.realm = realm;
+exports.heartbeat = heartbeat;
+exports.login = require('./framework/login');
+exports.fournotfour = require('./framework/fournotfour');
+
 // entity's exports
 exports.findUserbyuid = entity.findByUsername;
 

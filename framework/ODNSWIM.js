@@ -151,7 +151,7 @@ UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) 
     });
 };
 
-serPermissionSchema.methods.getPermission = function(granter, user, kingdom, fn) {
+UserPermissionSchema.methods.getPermission = function(granter, user, kingdom, fn) {
     Permission.hasGreaterPermission(granter, user, function(err) {
         // this functionality is available to the granter as well as the user
         if (!err || granter.uid === user.uid) {
@@ -228,18 +228,18 @@ exports.KingdomPermission = KingdomPermission;
 /**
  * Construct the gates of MORDOR!
  */
-exports.BlackGate = BlackGate;
-
-function BlackGate(app, express, passport) {
-    app.use(express.cookieParser('eylhjfgewhbfiwegqwgiqwhkbhkvgu'));
-    app.use(express.session({
-//        maxAge:new Date(Date.now() + 3600000),
-//        store: sessionStore
-    }));
-    require('connect-redis')(express);
+var BlackGate = function(app, express, passport) {
+    app.use(express.cookieParser('ahdbahsdavdjhbfhk'));
+    app.use(express.session({}));
+//    var RedisStore = require('connect-redis')(express);
+//    app.use(express.session({
+//        secret: "kqsdjfmlksdhfhzirzeoibrzecrbzuzefcuercazeafxzeokwdfzeijfxcerig",
+//        store: new RedisStore({ host: 'localhost' })
+//    }));
     app.use(passport.initialize());
     app.use(passport.session());
 }
+exports.BlackGate = BlackGate;
 
 //sessionStore = {
 //    get:    function(sid, callback) {
@@ -255,36 +255,42 @@ function BlackGate(app, express, passport) {
 //    }
 //};
 
+var serializer = function(user, done) {
+    log('debug', user.uid + ' serialized');
+    done(null, user.uid);
+};
+
+var deserializer = function(id, done) {
+    console.log('askdbjasdvhvdvdvhhbh')
+    id = 'god'; // todo: woho watch it there!
+    entity.findByUsername(id, function(err, u) {
+        if (u) log('debug', u.uid + ' deserialized');
+        if (err) log('crit', err);
+        done(err, u);
+    });
+};
+
 exports.createTheBlackGates = function(passport) {
     // Passport session setup.
     //   To support persistent login sessions, Passport needs to be able to
     //   serialize users into and deserialize users out of the session.  Typically,
     //   this will be as simple as storing the user ID when serializing, and finding
     //   the user by ID when deserializing.
-    passport.serializeUser(function(user, done) {
-//        entity.add(user, function(u){
-            done(null, user.uid);
-//        });
-    });
+    passport.serializeUser(serializer);
 
-    passport.deserializeUser(function(id, done) {
-        entity.findByUsername(id, function(err, u) {
-            done(err, u);
-        });
-    });
+    passport.deserializeUser(deserializer);
 
     // Use the LocalStrategy within Passport.
     //   Strategies in passport require a `verify` function, which accept
     //   credentials (in this case, a username and password), and invoke a callback
-    //   with a user object.  In the real world, this would query a database;
-    //   however, in this example we are using a baked-in set of users.
+    //   with a user object.
     passport.use(new LocalStrategy(
         function(username, password, done) {
             // asynchronous verification, for effect...
             process.nextTick(function () {
                 // Find the user by username.  If there is no user with the given
                 // username, or the password is not correct, set the user to `false` to
-                // indicate failure and set a flash message.  Otherwise, return the
+                // indicate failure.  Otherwise, return the
                 // authenticated `user`.
                 entity.findByUsername(username, function(err, user) {
                     // failure cases
@@ -298,7 +304,7 @@ exports.createTheBlackGates = function(passport) {
                         return done(null, false, {message: 'Invalid password'});
                     }
                     else {
-                        console.log('User auth passed');
+                        log('info', user.uid + ' user auth passed');
                         return done(null, user);
                     }
                 });
@@ -316,6 +322,7 @@ exports.createTheBlackGates = function(passport) {
 exports.openBlackGate = function(req, res, next) {
     var r = false;
     var u = req.url.split('/')[1];
+    console.log(req.user)
 
     if (req.isAuthenticated()) {
         if (u != '') {

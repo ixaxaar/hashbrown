@@ -265,3 +265,14 @@ exports.teamValidationSchema = teamValidationSchema;
 
 
 exports.validator = v;
+exports.validate = function(obj, schema) {
+    if (obj) {
+        var valid = !v.validate(obj, schema).errors.length;
+        if (!valid) log('warning', 'Object validation failed ' + JSON.stringify(obj));
+        return valid;
+    }
+    else {
+        log('warning', 'Object passed for validation was null');
+        return 1;
+    }
+};

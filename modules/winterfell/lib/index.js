@@ -22,6 +22,7 @@ var sendException = function(e, recovery) {
         recovery();
     } catch (e) {
         log('crit', "Double exception!");
+        throw e;
     }
     log('crit', "Exception occured while processing request");
 };
@@ -102,5 +103,5 @@ var winterfell = function(app) {
     app.all("*", function(req, res) { res.send(404); });
 };
 
-module.export = exports = winterfell;
+module.exports = exports = winterfell;
 

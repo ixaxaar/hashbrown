@@ -9,24 +9,17 @@
  */
 
 var express = require('express')
-    , realm = require('./framework/realm')
-    , fournotfour =  require('./framework/fournotfour')
-    , minas = require('./framework/minas')
-    , login = require('./framework/login')
     , http = require('http')
     , path = require('path')
-    , entity = require('./framework/entity')
-    , team = require('./framework/team')
     , passport = require('passport')
-    , heartbeat = require('./framework/heartbeat')
-    , mordor = require("./framework/ODNSWIM")
-    , winston = require('winston');
-
+    , framework = require('./framework')
+    , winston = require('winston')
+    , initframework = require('./framework/');
 
 // configure logging
 //noinspection BadExpressionStatementJS
 require('winston-syslog').Syslog;
-winston.add(winston.transports.Syslog, options);
+winston.add(winston.transports.Syslog);
 winston.setLevels(winston.config.syslog.levels);
 
 // these logging methods are available throughout the app
@@ -39,7 +32,7 @@ var app = express();
 // for tobi testing
 module.exports = app;
 
-mordor.createTheBlackGates(passport);
+framework.mordor.createTheBlackGates(passport);
 
 // development environment
 app.configure('development', function(){
@@ -54,7 +47,7 @@ app.configure('development', function(){
     app.use(express.logger('dev'));
     app.use(express.bodyParser());
     app.use(express.methodOverride());
-    mordor.BlackGate(app, express, passport);
+    framework.mordor.BlackGate(app, express, passport);
     app.use(express.static(path.join(__dirname, 'public')));
     app.use(app.router);
 });
@@ -68,7 +61,7 @@ if ('development' == app.get('env')) {
 }
 
 // load modules.json
-var kingdoms = realm.getKingdoms(app);
+var kingdoms = framework.realm.getKingdoms(app);
 if (!kingdoms) {
     err = "FATAL: Could not load modules";
     throw err;
@@ -76,10 +69,10 @@ if (!kingdoms) {
 
 /** Routing: default routing except home goes to 404 */
 
-app.get('/login', login.login);
+app.get('/login', framework.login.login);
 
 app.post('/login', function(req, res, next) {
-    req.accepts('application/json');
+//    req.accepts('application/json');
     passport.authenticate('local', function(err, user, info) {
         if (err) { return next(err) }
         if (!user) {
@@ -105,46 +98,44 @@ app.get('/logout', function(req, res){
 // redirect to login page if auth fails
 // it is _VERY_ important that next() is called,
 // otherwise no other route will work
-app.all("*", mordor.openBlackGate);
+app.all("*", framework.mordor.openBlackGate);
 
 // home page - where feeds may lie...
-app.get('/', mordor.openBlackGate, minas.tirith);
+app.get('/', framework.minas.tirith);
 
 // settings page, where every user can enter here,
 // but content is tailored depending on the user
-app.get('/settings', mordor.openBlackGate, minas.ithil);
+app.get('/settings', framework.minas.ithil);
 
-// setup the settings backend handler
+// setup the framework
+initframework(app);
 
-
-// initialize all APIs here
-
-realm.createKingdom(app, 'kingslanding');
-realm.createKingdom(app, 'winterfell');
+//framework.realm.createKingdom(app, 'kingslanding');
+//framework.realm.createKingdom(app, 'winterfell');
 
 // initialize and load routing rules for all modules
 kingdoms.forEach(function(kingdom) {
-    if (realm.isEnabled(app, kingdom)) {
-        realm.initKingdom(app, kingdom);
-        realm.enterKingdom(app, kingdom);
+    if (framework.realm.isEnabled(app, kingdom)) {
+        framework.realm.initKingdom(app, kingdom);
+        framework.realm.enterKingdom(app, kingdom);
     }
 });
 
 // chuck the rest into the narrow sea of 404's
-realm.narrowSea(app, fournotfour);
+framework.realm.narrowSea(app, framework.fournotfour);
 
 // test API
 testAPI  = function(string) {
     console.log(string);
 };
-realm.exposeAPI('test', 'test', testAPI);
+framework.realm.exposeAPI('test', 'test', testAPI);
 
 var cleanup = function() {
-    realm.destroyKingdom(app, 'kingslanding');
-    realm.destroyKingdom(app, 'winterfell');
+//    framework.realm.destroyKingdom(app, 'kingslanding');
+//    framework.realm.destroyKingdom(app, 'winterfell');
 };
 
-heartbeat.turnMeOn(cleanup);
+framework.heartbeat.turnMeOn(cleanup);
 
 http.createServer(app).listen(app.get('port'), function(){
   console.log('Express server listening on port ' + app.get('port'));

@@ -2,6 +2,7 @@
 // json schema validation - for request jsons
 var validation = require('./validation')
     , v = validation.validator
+    , validate = validation.validate
     , resultConstructorValidatorSchema = validation.resultConstructorValidatorSchema
     , requestValidatorSchema = validation.requestValidatorSchema;
 
@@ -9,6 +10,7 @@ var validation = require('./validation')
 var entity = require('./entity');
 var team = require('./team');
 var heartbeat = require('./heartbeat');
+var mordor = require('./ODNSWIM');
 
 var parentApp = null;
 
@@ -29,6 +31,7 @@ var sendException = function(e, recovery) {
         recovery();
     } catch (e) {
         console.log("Double exception!");
+        throw e;
     }
     console.log("Exception occured while processing request");
 };
@@ -44,7 +47,7 @@ var resultConstructor = function(request, uuid, msg, outcome) {
 var requestResponder = function(req, res, result, msg) {
     var r = new resultConstructor(req.request, req.uuid, result, msg);
 
-    if (!v.validate(r, resultConstructorValidatorSchema).errors.length) {
+    if (validate(r, resultConstructorValidatorSchema)) {
         res.send(r);
     }
     else {
@@ -63,7 +66,7 @@ var entityServer = function(req, res, next) {
     };
 
     try {
-        if (!v.validate(req.body, requestValidatorSchema).errors.length)
+        if (validate(req.body, requestValidatorSchema))
             switch (req.body.request) {
                 case 'add':
                     entity.addUser(req.user, req.body.body, respond);
@@ -107,7 +110,7 @@ var teamServer = function(req, res, next) {
     };
 
     try {
-        if (!v.validate(req.body, requestValidatorSchema).errors.length)
+        if (validate(req.body, requestValidatorSchema))
             switch(req.body.request) {
                 case 'adduser':
                     team.addUser(req.user, req.body.body, respond);
@@ -136,6 +139,7 @@ var teamServer = function(req, res, next) {
 
 var orgServer = function(req, res, next) {
     req.accepts('application/json');
+    console.log(req.user)
 
     var respond = function(result, msg) {
         result = !!result;
@@ -144,10 +148,11 @@ var orgServer = function(req, res, next) {
         requestResponder(req, res, result, msg);
     };
 
-    try {
-        if (!v.validate(req.body, requestValidatorSchema).errors.length)
+//    try {
+        if (validate(req.body, requestValidatorSchema))
             switch(req.body.request) {
                 case 'addteam':
+                    console.log(req.body)
                     team.createTeam(req.user, req.body.body, respond);
                     break;
 
@@ -168,11 +173,11 @@ var orgServer = function(req, res, next) {
                     break;
             }
         else respond(false, 'Request format is wrong');
-    } catch (e) {
-        sendException(e, function() {
-            respond(false, 'Request format is wrong');
-        });
-    }
+//    } catch (e) {
+//        sendException(e, function() {
+//            respond(false, 'Request format is wrong');
+//        });
+//    }
 
 };
 
@@ -193,8 +198,8 @@ var entityTree = function (app) {
 var teamTree = function(app) {
     try {
         // set up the framework
-        app.post('/team', mordor.openBlackGate, teamServer);
-        app.post('/user', mordor.openBlackGate, orgServer);
+        app.post('/team', teamServer);
+        app.post('/user', orgServer);
 
         team.team();
     }
@@ -210,4 +215,4 @@ var framework = function(app) {
     }
 };
 
-module.export = framework;
+module.exports = exports = framework;
