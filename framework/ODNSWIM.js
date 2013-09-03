@@ -230,30 +230,16 @@ exports.KingdomPermission = KingdomPermission;
  */
 var BlackGate = function(app, express, passport) {
     app.use(express.cookieParser('ahdbahsdavdjhbfhk'));
-    app.use(express.session({}));
-//    var RedisStore = require('connect-redis')(express);
-//    app.use(express.session({
-//        secret: "kqsdjfmlksdhfhzirzeoibrzecrbzuzefcuercazeafxzeokwdfzeijfxcerig",
-//        store: new RedisStore({ host: 'localhost' })
-//    }));
+    var RedisStore = require('connect-redis')(express);
+    app.use(express.session({
+        secret: "kqsdjfmlksdhfhzirzeoibrzecrbzuzefcuercazeafxzeokwdfzeijfxcerig",
+        store: new RedisStore({ host: 'localhost' })
+    }));
     app.use(passport.initialize());
     app.use(passport.session());
-}
+};
 exports.BlackGate = BlackGate;
 
-//sessionStore = {
-//    get:    function(sid, callback) {
-//
-//    },
-//
-//    set:    function(sid, session, callback) {
-//
-//    },
-//
-//    destroy:    function(sid, callback) {
-//
-//    }
-//};
 
 var serializer = function(user, done) {
     log('debug', user.uid + ' serialized');
@@ -261,8 +247,6 @@ var serializer = function(user, done) {
 };
 
 var deserializer = function(id, done) {
-    console.log('askdbjasdvhvdvdvhhbh')
-    id = 'god'; // todo: woho watch it there!
     entity.findByUsername(id, function(err, u) {
         if (u) log('debug', u.uid + ' deserialized');
         if (err) log('crit', err);
@@ -322,7 +306,6 @@ exports.createTheBlackGates = function(passport) {
 exports.openBlackGate = function(req, res, next) {
     var r = false;
     var u = req.url.split('/')[1];
-    console.log(req.user)
 
     if (req.isAuthenticated()) {
         if (u != '') {

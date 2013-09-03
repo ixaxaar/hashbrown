@@ -572,16 +572,16 @@ var godCreatesAnOrg = function(user, json, fn) {
                             var response = {
                                 "useruid" : newu.uid
                             };
-                            fn(null, response);
+                            fn(true, response);
                         }
-                        else fn(err, null);
+                        else fn(false, err);
                     });
                 }
-                else fn(err);
+                else fn(false, err);
             });
         }
-        else fn('thou shalt not be god!');
-    } else fn('Request format is wrong');
+        else fn(false, 'thou shalt not be god!');
+    } else fn(false, 'Request format is wrong');
 };
 exports.godCreatesAnOrg = godCreatesAnOrg;
 

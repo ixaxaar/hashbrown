@@ -37,7 +37,7 @@ var sendException = function(e, recovery) {
 };
 
 
-var resultConstructor = function(request, uuid, msg, outcome) {
+var resultConstructor = function(request, uuid, outcome, msg) {
     this.request = request;
     this.uuid = uuid;
     this.success =  (outcome ? true : false);
@@ -45,7 +45,7 @@ var resultConstructor = function(request, uuid, msg, outcome) {
 };
 
 var requestResponder = function(req, res, result, msg) {
-    var r = new resultConstructor(req.request, req.uuid, result, msg);
+    var r = new resultConstructor(req.body.request, req.body.uuid, result, msg);
 
     if (validate(r, resultConstructorValidatorSchema)) {
         res.send(r);
@@ -187,7 +187,7 @@ var entityTree = function (app) {
         if (!parentApp) parentApp = app;
         entity.entity();
 
-        app.post('/users', mordor.openBlackGate, entityServer);
+        app.post('/users', entityServer);
 
     } catch (e) { sendException(e, null); }
 

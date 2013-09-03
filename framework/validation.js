@@ -87,7 +87,15 @@ var resultConstructorValidatorSchema = {
         "request": { "type": "string", "required": "true" },
         "uuid": { "type": "string", "required": "true" },
         "success": { "type": "boolean", "required": "true" },
-        "msg": { "type": "object", "required": "true" }
+        "msg": { "anyOf": [
+                {
+                    "description": "object"
+                },
+                {
+                    "description": "string"
+                }
+            ]
+        }
     }
 };
 
@@ -268,7 +276,9 @@ exports.validator = v;
 exports.validate = function(obj, schema) {
     if (obj) {
         var valid = !v.validate(obj, schema).errors.length;
-        if (!valid) log('warning', 'Object validation failed ' + JSON.stringify(obj));
+        if (valid === false) {
+            console.log(v.validate(obj, schema).errors.toString());
+        }
         return valid;
     }
     else {
