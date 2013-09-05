@@ -13,6 +13,7 @@ http://localhost:3000/login
 
 2. Create an organization (also creates a user e.g. 'org1'):
 http://localhost:3000/user
+```JSON
 {
 	"request":"createorg",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -24,9 +25,11 @@ http://localhost:3000/user
 	        "kingdoms": ["winterfell"]
 	}
 }
+```
 
 3. Add users to your organization (login via user org1):
 http://localhost:3000/users
+```JSON
 {
 	"request":"add",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -35,9 +38,11 @@ http://localhost:3000/users
 	        "password": "123"
 	}
 }
+```
 
 4. Promote user:
 http://localhost:3000/users
+```JSON
 {
 	"request":"promote",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -46,9 +51,11 @@ http://localhost:3000/users
 	        "permission": "admin"
 	}
 }
+```
 
 5. Grant kingdom permissions to a user:
 http://localhost:3000/users
+```JSON
 {
 	"request":"grant",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -58,9 +65,11 @@ http://localhost:3000/users
 	        "kingdom": "winterfell"
 	}
 }
+```
 
 5. Revoke kingdom permissions to a user:
 http://localhost:3000/users
+```JSON
 {
 	"request":"revoke",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -70,9 +79,11 @@ http://localhost:3000/users
 	        "kingdom": "winterfell"
 	}
 }
+```
 
 6. Re-associate a user to a different parent:
 http://localhost:3000/users
+```JSON
 {
 	"request":"reassociate",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -81,9 +92,11 @@ http://localhost:3000/users
 	        "newParent": "u1@org1"
 	}
 }
+```
 
 7. Delete a user:
 http://localhost:3000/users
+```JSON
 {
 	"request":"delete",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -91,9 +104,11 @@ http://localhost:3000/users
 	        "username": "u2@org1"
 	}
 }
+```
 
 8. Create a team:
 http://localhost:3000/user
+```JSON
 {
 	"request":"addteam",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -104,9 +119,11 @@ http://localhost:3000/user
 	        "dbConnection": "mongodb://localhost"
 	}
 }
+```
 
 9. Add a user to a team:
 http://localhost:3000/team
+```JSON
 {
 	"request":"adduser",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -115,9 +132,11 @@ http://localhost:3000/team
 	        "team": "t1@org1"
 	}
 }
+```
 
 10. Change a team's owner:
 http://localhost:3000/team
+```JSON
 {
 	"request":"changeowner",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -126,9 +145,11 @@ http://localhost:3000/team
 	        "team": "t4@org1"
 	}
 }
+```
 
 11. Get the whole team structure, perhaps the first thing to be called before any mgmt APIs:
 http://localhost:3000/team
+```JSON
 {
 	"request":"getallusers",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
@@ -136,10 +157,11 @@ http://localhost:3000/team
 	        "team": "t2@org1"
 	}
 }
-
+```
 
 Response schema validator is:
 
+```Javascript
 var resultConstructorValidatorSchema = {
     "id": "/resultConstructorValidatorSchema",
     "type": "object",
@@ -158,7 +180,7 @@ var resultConstructorValidatorSchema = {
         }
     }
 };
-
+```
 
 P.S.
 Every feed has "uuid" field which can be used by frontend to verify the response.
