@@ -318,7 +318,7 @@ OrganizationSchema.methods.createTeam = function(granter, name, dbConnection, db
 
 OrganizationSchema.methods.destroy = function() {
     this._disconnect();
-    this.delete(fn);
+//    this.delete(fn);
 };
 
 OrganizationSchema.methods.findTeam = function(teamName, fn) {
