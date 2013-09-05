@@ -18,6 +18,7 @@ mongoose.connect('mongodb://localhost/persistence');
 // json schema validation - for request jsons
 var validation = require('./validation')
     , v = validation.validator
+    , validate = validation.validate
     , userValidationSchema = validation.userValidationSchema
     , addUserValidationSchema = validation.addUserValidationSchema
     , deleteUserValidationSchema = validation.deleteUserValidationSchema
@@ -77,7 +78,7 @@ var GOD = null;
 UserSchema.methods.createUser = function(granter, uid, hash, fn) {
     var that = this;
 
-//    if (GOD === null || !v.validate(granter, userValidationSchema).errors.length) {
+//    if (GOD === null || validate(granter, userValidationSchema)) {
         // god is created by nobody, so exempt him,
         // for all other users, the granter must be manager and above
         if ((uid === 'god' && GOD === null)  ||
@@ -123,7 +124,7 @@ UserSchema.methods.createUser = function(granter, uid, hash, fn) {
 
 // delete a user
 UserSchema.methods.deleteUser = function(granter, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
 
         var that = this;
 
@@ -145,7 +146,7 @@ UserSchema.methods.deleteUser = function(granter, fn) {
 
 // grant permissions to a user
 UserSchema.methods.grantUser = function(granter, kingdom, perm, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
 
         var that = this;
 
@@ -169,7 +170,7 @@ UserSchema.methods.grantUser = function(granter, kingdom, perm, fn) {
 
 // revoke permissions from a user
 UserSchema.methods.revokeUser = function(granter, kingdomName, perm, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
 
         var that = this;
 
@@ -194,7 +195,7 @@ UserSchema.methods.revokeUser = function(granter, kingdomName, perm, fn) {
 
 // promote a user's admin permission
 UserSchema.methods.promoteUser = function(granter, perm, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
 
         var that = this;
 
@@ -208,8 +209,8 @@ UserSchema.methods.promoteUser = function(granter, perm, fn) {
 
 // reassociate a user to a different parent
 UserSchema.methods.reassocUser = function(granter, newParent, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length &&
-        !v.validate(newParent, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema) &&
+        validate(newParent, userValidationSchema)) {
 
         var that = this;
 
@@ -242,7 +243,7 @@ UserSchema.methods.reassocUser = function(granter, newParent, fn) {
 
 // update a user's profile data
 UserSchema.methods.updateProfile = function(granter, data, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
 
         var that = this;
 
@@ -254,7 +255,7 @@ UserSchema.methods.updateProfile = function(granter, data, fn) {
 
 // change password
 UserSchema.methods.passwd = function(granter, passwd, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
 
         var that = this;
 
@@ -271,27 +272,28 @@ UserSchema.methods.passwd = function(granter, passwd, fn) {
 
 // add an user to a team
 UserSchema.methods.addUserToTeam = function(granter, team, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
 
         var that = this;
 
-        permissions.hasGreaterPermission(granter, that, function(err) {
-            if (!err) {
-                that.teams.push(t.name);
+//        permissions.hasGreaterPermission(granter, that, function(err) {
+//            if (!err) {
+        console.log(team)
+                that.teams.push(team);
                 that.save(function(err, user) {
-                    if (!err && st) fn(null, user);
+                    if (!err && user) fn(null, user);
                     else fn('Could not save', null);
                 });
-            }
-            else fn('Granter does not have sufficient permission', null);
-        });
+//            }
+//            else fn('Granter does not have sufficient permission', null);
+//        });
     }
     else fn('Request format is wrong');
 };
 
 // remove an user from a team
 UserSchema.methods.removeUserFromTeam = function(granter, teamName, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
 
         var that = this;
 
@@ -354,12 +356,22 @@ KingdomSchema.methods.Remove = function(kingdom, fn) {
     return fn('Could not remove kingdom', kingdom);
 };
 
-exports.findKingdomByUrl = function(name, fn) {
-    Kingdoms.forEach(function(k) {
-        if (k.pkg[0].name == name) fn(null, k);
-        else fn('Could not find kingdom', null);
-    })
+findKingdomByUrl = function(name, fn) {
+    var ret = false;
+    if (name && fn)
+        Kingdoms.forEach(function(k) {
+            if (k.pkg[0].name == name) {
+                ret = true;
+                fn(null, k);
+            }
+        });
+
+    if (!ret) {
+        log('info', 'Could not find kingdom ' + name);
+        fn('Could not find kingdom', null);
+    }
 };
+exports.findKingdomByUrl = findKingdomByUrl;
 
 // register the model globally
 var Kingdom = mongoose.model("KingdomSchema", KingdomSchema);
@@ -377,11 +389,11 @@ var addOrgUser = function(granter, name, orgName, pass, kingdoms, fn) {
             // assign it an org
             org.org = orgName;
             // assign it org admin permission
-            org.promote(granter, permissions.org, function(err, orgp) {
+            org.promoteUser(granter, permissions.org, function(err, orgp) {
                 if (!err && orgp) {
                     // assign it org permission for every subscribed kingdom
                     kingdoms.forEach(function(k) {
-                        orgp.grant(granter, orgp, k, permissions.org, function(err) {
+                        orgp.grantUser(granter, k, permissions.org, function(err) {
                             if (err) fn(err);
                             else {
                                 orgp.save(function(err, orgs) {
@@ -426,8 +438,8 @@ exports.removeFromTeam = removeFromTeam;
  *
  */
 createUser = function(granter, json, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length &&
-        !v.validate(json, addUserValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema) &&
+        validate(json, addUserValidationSchema)) {
 
         var u = new User({});
 
@@ -459,8 +471,8 @@ exports.addUser = createUser;
  *
  */
 deleteUser = function(granter, json, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length &&
-        !v.validate(json, deleteUserValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema) &&
+        validate(json, deleteUserValidationSchema)) {
 
         findByUsername(json.username, function(err, u) {
             if (!err && u) u.deleteUser(granter,
@@ -516,14 +528,14 @@ var getPermission = function(perm) {
  *
  */
 promote = function(granter, json, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length &&
-        !v.validate(json, promoteUserValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema) &&
+        validate(json, promoteUserValidationSchema)) {
 
         findByUsername(json.username, function(err, u) {
             var perm = getPermission(json.permission);
 
             if (!err && u && perm) {
-                u.promote(granter, perm, function(err, pu) {
+                u.promoteUser(granter, perm, function(err, pu) {
                     if (err || !pu) fn(false, err);
                     else {
                         pu.save(function(err) {
@@ -558,13 +570,13 @@ exports.promote = promote;
  *
  */
 grant = function(granter, json, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length &&
-        !v.validate(json, grantUserValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema) &&
+        validate(json, grantUserValidationSchema)) {
 
         findByUsername(json.username, function(err, u) {
             var perm = getPermission(json.permission);
 
-            if (!err && u && perm) u.grant(granter, json.kingdom, perm,
+            if (!err && u && perm) u.grantUser(granter, json.kingdom, perm,
                 function(err, pu) {
                     if (err || !pu) fn(false, err);
                     else {
@@ -597,13 +609,13 @@ exports.grant = grant;
  *
  */
 revoke = function(granter, json, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length &&
-        !v.validate(json, revokeUserValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema) &&
+        validate(json, revokeUserValidationSchema)) {
 
         findByUsername(json.username, function(err, u) {
             var perm = getPermission(json.permission);
 
-            if (!err && u && perm) u.revoke(granter, json.kingdom, perm,
+            if (!err && u && perm) u.revokeUser(granter, json.kingdom, perm,
                 function(err, pu) {
                     if (err || !pu) fn(false, err);
                     else {
@@ -637,8 +649,8 @@ exports.revoke = revoke;
  *
  */
 var reassociate = function(granter, json, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length &&
-        !v.validate(json, reassociateUserValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema) &&
+        validate(json, reassociateUserValidationSchema)) {
 
         findByUsername(json.username, function(err, u) {
             if (err || !u) fn(false, 'could not find user');
@@ -682,7 +694,7 @@ var userTree = function(entity) {
 
 // construct a tree starting from the asker / granter
 var getEntityTree = function(granter, fn) {
-    if (!v.validate(granter, userValidationSchema).errors.length) {
+    if (validate(granter, userValidationSchema)) {
         var tree = new userTree(granter);
         fn(true, tree);
     }

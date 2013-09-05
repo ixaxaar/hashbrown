@@ -54,10 +54,17 @@ var _calcMaxPermission = function(entity, kingdom, fn) {
 };
 
 var _hasGreaterPermission = function(granter, user, fn) {
-    if ((granter.perm[0].admin > user.perm[0].admin) ||
-    ((granter.perm[0].admin & user.perm[0].admin) == Permission.god)) {
-        fn(null);
-    } else fn('Granter has lesser permission than user');
+    if (granter.org === user.org) {
+        if ((granter.perm[0].admin > user.perm[0].admin) ||
+            ((granter.perm[0].admin & user.perm[0].admin) == Permission.god)) {
+            fn(null);
+        } else fn('Granter has lesser permission than user');
+    }
+    else if (granter.uid === 'god') fn(null);
+    else {
+        log('warning', 'someone tried to access other organizations user');
+        fn('you stop right there buddy');
+    }
 };
 
 var Permission = {

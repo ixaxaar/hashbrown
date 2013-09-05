@@ -51,8 +51,18 @@ var userValidationSchema = {
     "properties": {
         "uuid": { "type": "string", "required": "true" },
         "uid": { "type": "string", "required": "true" },
-        "profile": { "$ref": "/userProfileValidationSchema", "required": "true" },
-        "perm": { "$ref": "/userPermissionValidationSchema", "required": "true" },
+        "profile": {
+            "type": "array",
+            "items": {
+                "$ref": "/userProfileValidationSchema",
+                "required": "true" }
+        },
+        "perm": {
+            "type": "array",
+            "items": {
+                "$ref": "/userPermissionValidationSchema",
+                "required": "true" }
+        },
         "children": {
             "type": "array",
             "items": { "type": "string" },
@@ -151,7 +161,8 @@ var grantUserValidationSchema = {
     "type": "object",
     "properties": {
         "username" : { "type": "string" , "required": "true" },
-        "permission" : { "type": "string", "required": "true" }
+        "permission" : { "type": "string", "required": "true" },
+        "kingdom" : { "type": "string", "required": "true" }
     }
 };
 
@@ -160,7 +171,8 @@ var revokeUserValidationSchema = {
     "type": "object",
     "properties": {
         "username" : { "type": "string" , "required": "true" },
-        "permission" : { "type": "string", "required": "true" }
+        "permission" : { "type": "string", "required": "true" },
+        "kingdom" : { "type": "string", "required": "true" }
     }
 };
 
@@ -169,7 +181,7 @@ var reassociateUserValidationSchema = {
     "type": "object",
     "properties": {
         "username" : { "type": "string" , "required": "true" },
-        "permission" : { "type": "string", "required": "true" }
+        "newParent" : { "type": "string", "required": "true" }
     }
 };
 

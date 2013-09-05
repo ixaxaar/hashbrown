@@ -24,7 +24,7 @@ var validation = require('./validation')
 
 var entity = require('./entity');
 var mordor = require('./ODNSWIM')
-    , permissions = mordor.permissions;
+    , permissions = mordor.Permission;
 
 
 // Array Remove - By John Resig (MIT Licensed)
@@ -132,18 +132,23 @@ TeamSchema.methods.createTeam = function (conn, granter, name, dbConnection, dbN
 
 // not to be used directly
 TeamSchema.methods._connect = function(fn) {
-    var cstring = this.connnectionString;
+    var cstring = this.connectionString;
     var exist = connMgr.getConnection(cstring);
+    console.log(cstring)
 
     if (cstring && !exist) {
-        var conn = mongoose.createConnection(cstring);
+        var conn = goose.createConnection(cstring);
         // save connection instance
-        Connmgr.setConnection(conn, cstring);
+        connMgr.setConnection(conn, cstring);
         return fn(null, conn);
     }
     // connection already exists, return that
-    else if (exist) return fn(null, exist);
-    else return fn('Could not connect', null);
+    else if (exist) {
+        return fn(null, exist);
+    }
+    else {
+        return fn('Could not connect', null);
+    }
 };
 
 // not to be used directly
@@ -162,13 +167,17 @@ TeamSchema.methods.addUser = function(user, fn) {
     if (validate(user, userValidationSchema)) {
 
         var that = this;
-        entity.addtoTeam(user, this.connectionString, function(err, u) {
-
-            that.users.push(u.uid);
-            that.save(function(err, sthat) {
-                if (!err && sthat) fn(null, sthat);
-                else fn('Could not add team to user');
-            });
+        entity.addtoTeam(user, this.name, function(err, u) {
+            if (!err && u) {
+                that.users.push(u.uid);
+                that.save(function(err, sthat) {
+                    if (!err && sthat) fn(null, sthat);
+                    else fn('Could not add team to user');
+                });
+            }
+            else {
+                fn('Could not add team to user');
+            }
         });
     }
     else fn('Request format is wrong', null);
@@ -221,7 +230,7 @@ OrganizationSchema.index({ name: 1 });
 
 OrganizationSchema.virtual('connectionString')
     .get(function () {
-        return (this.dbConnection + this.dbName);
+        return (this.dbConnection + '/' + this.dbName);
     });
 
 // this has to be inside cause every schema is mapped to its mongoose connection
@@ -231,7 +240,7 @@ OrganizationSchema.methods._connect = function(fn) {
     // create a connection to this organization's database
     if (this.connectionString && !conn) {
         console.log(this.connectionString)
-        var conn = mongoose.createConnection(this.connectionString);
+        var conn = goose.createConnection(this.connectionString);
         // save the connection instance
         connMgr.setConnection(conn, this.connectionString);
 
@@ -300,7 +309,7 @@ OrganizationSchema.methods.createTeam = function(granter, name, dbConnection, db
                 else fn(err, null);
             });
         }
-        else fn('Organizaion is not connected', null);
+        else fn('Organization is not connected', null);
     }
     else fn('Request format is wrong');
 };
@@ -312,7 +321,7 @@ OrganizationSchema.methods.destroy = function() {
 
 OrganizationSchema.methods.findTeam = function(teamName, fn) {
     var conn = connMgr.getConnection(this.connectionString);
-    var Team = conn.goose.model("TeamSchema", TeamSchema);
+    var Team = conn.model("TeamSchema", TeamSchema);
 
     if (conn) Team.findOne( {name: teamName}, function(err, t){
         if (!err && t) fn(null, t);
@@ -373,12 +382,18 @@ var verify = function(user, entity, fn) {
     // P.S. team owners have to be specified manually after team's creation
     if ((permissions.hasAdminPermission(user, permissions.mgr)) &&
         (entity.owner == user))
-        fn(true);
+    {
+        console.log('here')
+        fn(null);
+    }
 
     // admin and higher accounts can make changes if their organizations are the same
     else if ((permissions.hasAdminPermission(user, permissions.admin))
         && (user.org == entity.orgName))
-        fn(true);
+    {
+        console.log('here2')
+        fn(null);
+    }
 
     // NOTE: this has an interesting side-effect:
     // only org-level users can create an org-level team
@@ -386,7 +401,7 @@ var verify = function(user, entity, fn) {
     // can create subteams, and the subteam owners or the admin can create more
     // subteams and so on. mgrs of a team can create their own sub-teams
 
-    else fn(false);
+    else fn('Permission denied');
 };
 
 
@@ -442,17 +457,17 @@ var createTeam = function(user, json, fn) {
                                         "useruid": user.uid,
                                         "teamname": team.name
                                     };
-                                    fn(null, response);
+                                    fn(true, response);
                                 }
-                                else fn(err);
+                                else fn(false, err);
                             });
                     }
-                    else fn('User does not have permission to do that');
+                    else fn(false, 'User does not have permission to do that');
                 });
-            } else fn('No such organization exists');
+            } else fn(false, 'No such organization exists');
         });
     }
-    else fn('Request format is wrong');
+    else fn(false, 'Request format is wrong');
 };
 exports.createTeam = createTeam;
 
@@ -476,26 +491,31 @@ var addUser = function(granter, json, fn) {
             console.log(granter.org)
             if (!err && org) {
                 org.findTeam(json.team, function(err, t) {
-                    if (!err && t) entity.findByUsername(json.name, function(err,  u) {
-                        if (!err && u) {
-                            // verify if the granter owns the team, or if the granter is higher-up
-                            verify(granter, t, function(err) {
-                                if (!err) {
-                                    t.addUser(u, function(err, au) {
-                                        if (!err) fn(null, { useruid: au.uid });
-                                        else fn(err, null);
-                                    });
-                                }
-                                else fn('User does not have permission to do that');
-                            });
-                        }
-                    });
+                    if (!err && t) {
+                        entity.findByUsername(json.name, function(err,  u) {
+                            if (!err && u) {
+                                // verify if the granter owns the team, or if the granter is higher-up
+                                verify(granter, t, function(err) {
+                                    if (!err) {
+                                        // todo: prevent one user to be added multiple times
+                                        t.addUser(u, function(err, au) {
+                                            if (!err) fn(null, { useruid: au.children });
+                                            else fn(false, err);
+                                        });
+                                    }
+                                    else fn(false, 'User does not have permission to do that');
+                                });
+                            }
+                            else fn(false, 'Could not find user');
+                        });
+                    }
+                    else fn(false, 'Could not find team');
                 });
             }
-            else fn('Could not find organization');
+            else fn(false, 'Could not find organization');
         });
     }
-    else fn('Request format is wrong');
+    else fn(false, 'Request format is wrong');
 };
 exports.addUser = addUser;
 
@@ -513,7 +533,6 @@ exports.addUser = addUser;
  * }
  *
  */
-
 var changeTeamOwner = function(granter, json, fn) {
     if (validate(json, changeTeamOwnerValidationSchema)) {
         findOrganization(granter.org, function(err, org) {
@@ -560,7 +579,7 @@ exports.changeTeamOwner = changeTeamOwner;
  */
 var godCreatesAnOrg = function(user, json, fn) {
     if (validate(json, godCreatesAnOrgSchema)) {
-        if (user.uid == 'god') {
+        if (user.uid === 'god') {
             var org = new Organization();
 
             // create an organization an user and bind the user to that organization
@@ -592,11 +611,12 @@ var teamConstructor = function() {
         // connect all organizations and their teams
         if (!err) {
             orgs.forEach(function(o) {
+                console.log(o)
                 o._connect(function(err)
                 { if (err) console.log('Could not connect organization ' + o.name + err) });
             });
         }
-    })
+    });
 };
 exports.team = teamConstructor;
 
