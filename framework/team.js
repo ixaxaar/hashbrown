@@ -10,6 +10,7 @@ var mongoose = goose.createConnection(settingsdb);
 
 var path = require('path');
 var uuid = require('node-uuid');
+var _ = require('underscore');
 
 // json schema validation - for request jsons
 var validation = require('./validation')
@@ -114,6 +115,7 @@ TeamSchema.methods.createTeam = function (conn, granter, name, dbConnection, dbN
                     }
                 }
 
+                console.log(ret)
                 if (!ret) that.save(function(err, st) {
                     if (!err && st) {
                         fn(null, st);
@@ -333,28 +335,34 @@ OrganizationSchema.methods.findTeam = function(teamName, fn) {
 // Tree Creator
 ////////////////////////
 
-var teamTree = function(team, org) {
+var teamTree = function(team, conn) {
     this.owner = team.owner;
     this.name = team.name;
-    this.databaseConnection = team.dbConnection;
+    this.dbConnection = team.dbConnection;
     this.databaseName = team.dbName;
     this.users = team.users;
-
     this.children = [];
-
-    var Team = connMgr.getConnection(org.connectionString).model("TeamSchema", TeamSchema);
     var that = this;
-    team.children.forEach(function(c) {
-        Team.findOne({ name: c }, function(err, child) {
-            if (child) that.children.push( new teamTree(child, org));
-        });
-    });
+
+//    if (conn) {
+//        var Team = conn.model("TeamSchema", TeamSchema);
+        team.children.forEach(function(c) {
+//            // todo: problem this _cannot_ execute in sync! wtf!
+//            Team.findOne({ name: c }, function(err, child) {
+//                if (!err && child) {
+//                    that.children.push(new teamTree(child, conn));
+//                }
+            that.children.push(c);
+            });
+//        });
+//    }
 };
 
-OrganizationSchema.methods.TeamTree = function(teamName, fn) {
+OrganizationSchema.methods.TeamTree = function(teamName, org, fn) {
     var Team = connMgr.getConnection(org.connectionString).model("TeamSchema", TeamSchema);
     Team.findOne({ name: teamName }, function(err, t) {
-        if (!err && t) fn(null, new teamTree(t, this));
+//        console.log(new teamTree(t, connMgr.getConnection(org.connectionString)))
+        if (!err && t) fn(null, new teamTree(t, connMgr.getConnection(org.connectionString)));
         else fn('Could not find team', null);
     });
 };
@@ -427,6 +435,33 @@ var result = function(uuid, type, msg, outcome){
     this.msg = msg;
 };
 
+
+/**
+ * json body structure:
+ * Input:
+ * {
+ *  team: String
+ * }
+ *
+ * Output:
+ * {
+ * tree
+ * }
+ *
+ */
+var getAllUsers = function(user, json, fn) {
+    Organization.findOne({ name: user.org }, function(err, org) {
+        if (!err && org) {
+            org.TeamTree(json.team, org, function(err, tree) {
+                if (!err) fn(true, tree);
+                else fn(false, err);
+            });
+        }
+        else fn(false, 'could not find organization');
+    });
+};
+exports.getAllUsers = getAllUsers;
+
 /**
  * json body structure:
  * Input:
@@ -448,8 +483,8 @@ var createTeam = function(user, json, fn) {
     if (validate(json, createTeamSchema)) {
         Organization.findOne({ name: user.org }, function(err, org) {
             if (!err && org) {
-                verify(user, org, function(err) {
-                    if (!err) {
+//                verify(user, org, function(err) {
+//                    if (!err) {
                         org.createTeam(user, json.name,
                             json.dbConnection, json.dbName, json.parent, function(err, team) {
                                 if (!err && team) {
@@ -461,9 +496,9 @@ var createTeam = function(user, json, fn) {
                                 }
                                 else fn(false, err);
                             });
-                    }
-                    else fn(false, 'User does not have permission to do that');
-                });
+//                    }
+//                    else fn(false, 'User does not have permission to do that');
+//                });
             } else fn(false, 'No such organization exists');
         });
     }
@@ -541,22 +576,23 @@ var changeTeamOwner = function(granter, json, fn) {
                     if (!err && t) {
                         verify(granter, t, function(err) {
                             entity.findByUsername(json.name, function(err, u) {
-                                t.setOwner(u, function(err, t) {
+                                if (!err && u ) t.setOwner(u, function(err, t) {
                                     if (!err && t) t.save(function(err, t) {
-                                        if (!err && t) fn(null, { useruid: u.uid });
-                                        else fn('Could not save');
+                                        if (!err && t) fn(true, JSON.stringify(t));
+                                        else fn(false, 'Could not save');
                                     });
                                 });
+                                else fn(false, 'User not found');
                             })
                         })
                     }
-                    else fn('Could not find team');
+                    else fn(false, 'Could not find team');
                 })
             }
-            else fn('Could not find organization');
+            else fn(false, 'Could not find organization');
         });
     }
-    else fn('Request format is wrong');
+    else fn(false, 'Request format is wrong');
 };
 exports.changeTeamOwner = changeTeamOwner;
 

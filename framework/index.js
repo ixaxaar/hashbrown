@@ -124,6 +124,10 @@ var teamServer = function(req, res, next) {
                     team.getAllUsers(req.user, req.body.body, respond);
                     break;
 
+                case 'changeowner':
+                    team.changeTeamOwner(req.user, req.body.body, respond);
+                    break;
+
                 default:
                     respond(false, 'Request format is wrong');
                     break;
