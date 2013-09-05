@@ -6,10 +6,12 @@ Tested APIs:
 
 1. Login:
 http://localhost:3000/login
+```JSON
 {
 	"username": "god",
 	"password" : "123"
 }
+```
 
 2. Create an organization (also creates a user e.g. 'org1'):
 http://localhost:3000/user
