@@ -24,22 +24,22 @@ var createFeedSchema = {
         "location": { "type": "string" },
         "belongs": {
             "type": "array",
-            "items": "string"
+            "items": { "type": "string"}
         },
         "mentions": {
             "type": "array",
-            "items": "string"
+            "items": { "type": "string"}
         }
     },
     "private": { "type": "string" },
     "tags": {
         "type": "array",
-        "items": "string"
+        "items": { "type": "string"}
     },
     "versioned": { "type": "boolean" },
     "associations": {
         "type": "array",
-        "items": "object"
+        "items": { "type": "string"}
     }
 };
 v.addSchema(createFeedSchema, '/createFeedSchema');
@@ -82,8 +82,17 @@ v.addSchema(removeFeedValidationSchema, '/removeFeedValidationSchema');
 exports.removeFeedValidationSchema = removeFeedValidationSchema;
 
 exports.validator = v;
-exports.validate = function(object, schema) {
-    return !v.validate(object, schema).errors.length;
+exports.validate = function(obj, schema) {
+    if (obj) {
+        var valid = !v.validate(obj, schema).errors.length;
+        if (valid === false) {
+            console.log(v.validate(obj, schema).errors);
+        }
+        return valid;
+    }
+    else {
+        log('warning', 'Object passed for validation was null');
+        return 1;
+    }
 };
-
 

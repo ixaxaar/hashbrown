@@ -14,15 +14,15 @@ var app = express();
 //by each sub-module
 module.exports = function () {
     // the POST routes
-//    app.post(/.*/, framework.checkCredentials);
+    app.post(/.*/, framework.checkCredentials);
 
-//    var winterfell = require('./lib/');
-//    winterfell(app);
+    var winterfell = require('./lib/');
+    winterfell(app);
 
-    // any intermediate GET routes go here
+//    any intermediate GET routes go here
 
-    // for everything else
-//    app.all("*", function(req, res) { return res.send(404); });
+//    for everything else
+    app.all("*", function(req, res) { return res.send(404); });
 
     return app;
 }();

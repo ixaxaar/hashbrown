@@ -12,7 +12,8 @@ var framework = require('../../../framework'),
     permissions = framework.permissions;
 
 var validation = require('./validation')
-    , validate = validation.validator
+    , validate = validation.validate
+    , createFeedSchema = validation.createFeedSchema
     , removeChildValidationSchema = validation.removeChildValidationSchema
     , removeFeedValidationSchema = validation.removeFeedValidationSchema;
 
@@ -88,6 +89,7 @@ var Tag = mongoose.model("TagSchema", TagSchema);
 var FeedSchema = new Schema({
     uuid: { type: String, default: uuid.v4() },
     owner: String, // the owner's uid
+    org: String, // the owner'S organization
     private: Boolean, // for private posts
     created: { type : Date, default: Date.now() },
     updated: { type : Date, default: Date.now() },
@@ -97,7 +99,7 @@ var FeedSchema = new Schema({
     acl: [String], // @mentions of people
     children: [ChildFeedSchema], // stack of child feeds
     versioned: { type: Boolean, default: false }, // is this versioned?
-    associations: { type: ObjectId } // any associations for other modules
+    associations: { type: Array } // any associations for other modules
 });
 FeedSchema.index({ owner: 1, updated: -1 });
 FeedSchema.index({ teams: 1 });
@@ -117,7 +119,7 @@ history(FeedSchema);
      "private": "",        // boolean - private or public post
      "tags": [],           // optional - tags for faster searching
      "versioned": ""       // optional, boolean
-     "associations": ""    // associations, request from differetn module
+     "associations": ""    // associations, request from different module
  }
  Output:
  {
@@ -128,6 +130,7 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
     if (validate(json, createFeedSchema)) {
         this.owner = user.uid;
         this.children = [];
+        this.org = user.org;
 
         // fill-in the content
         this.content = [new Content({})];
@@ -137,7 +140,7 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
         this.content[0].displayname = json.name             || '';
         this.content[0].videoFiles = [];
         this.content[0].location = json.location            || '';
-        this.content[0].description = json.description      || '';
+        this.content[0].description = json.content          || '';
 
         var that = this;
 
@@ -145,7 +148,7 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
         if (json.private) {
             this.private = true;
             this.teams = [];
-        } else if (json.belongs.length) {
+        } else if (json.belongs) {
             json.belongs.forEach(function(t) {
                 // policy: only add teams that the user himself belongs to
                 if(_.indexOf(user.teams, t) != -1)
@@ -154,14 +157,14 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
         }
 
         // add all the tags
-        if (json.tags.length) {
+        if (json.tags) {
             json.tags.forEach(function(t) {
                 that.tags.push(new Tag({ name: t }));
             });
         }
 
         // add all those who were mentioned to this feed's acl
-        json.mentions.forEach(function(m) {
+        if (json.mentions) json.mentions.forEach(function(m) {
             // note: covered query
             user.model("UserSchema").findOne({ uid: m }, { uid: 1 }, function(err, u) {
                 if (!err && u) that.acl.push(u.uid);
@@ -174,10 +177,10 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
         // commit to DB
         this.save(function(err, t) {
             if (!err || t) fn(true, { "uuid": t.uuid });
-            else fn(false, 'Could not save');
+            else fn(false, 'Could not save ' + err.message);
         });
     }
-    else fn('Request format is wrong');
+    else fn(false, 'Request format is wrong');
 };
 
 /** JSON request structure:

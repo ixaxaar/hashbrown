@@ -6,8 +6,9 @@ var framework = require('../../../framework')
     , report = framework.heartbeatEnabled;
 
 var validation = require('./validation')
-    , validate = validation.validator
-    , requestValidatorSchema = validation.requestValidatorSchema;
+    , validate = validation.validate
+    , requestValidatorSchema = validation.requestValidatorSchema
+    , resultConstructorValidatorSchema = validation.resultConstructorValidatorSchema;
 
 var sendException = function(e, recovery) {
     if (report) {
@@ -36,7 +37,7 @@ var resultConstructor = function(request, uuid, msg, outcome) {
 };
 
 var requestResponder = function(req, res, result, msg) {
-    var r = new resultConstructor(req.request, req.uuid, result, msg);
+    var r = new resultConstructor(req.request, req.uuid, msg, result);
 
     if (validate(r, resultConstructorValidatorSchema)) {
         res.send(r);
@@ -49,7 +50,7 @@ var requestResponder = function(req, res, result, msg) {
 var feedRequestRouter = function(req, res, next) {
     req.accepts('application/json');
 
-    try {
+//    try {
         var respond = function(result, msg) {
             result = !!result;
             if (!msg) msg = result;
@@ -87,20 +88,21 @@ var feedRequestRouter = function(req, res, next) {
                     break;
 
                 default:
+                    log('warning', 'invalid request');
                     respond(false, 'Request not found');
             }
         else respond(false, 'Request not found');
-    } catch (e) {
-        sendException(e, function() {
-            respond(false, 'Request format is wrong');
-        });
-    }
+//    } catch (e) {
+//        sendException(e, function() {
+//            respond(false, 'Request format is wrong');
+//        });
+//    }
 };
 
 var winterfell = function(app) {
     app.post(/\/feed/, feedRequestRouter);
 
-    app.all("*", function(req, res) { res.send(404); });
+//    app.all("*", function(req, res) { res.send(404); });
 };
 
 module.exports = exports = winterfell;

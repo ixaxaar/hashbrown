@@ -28,189 +28,259 @@ var mongoose = require('mongoose')
 var uuid = require('node-uuid');
 var _ = require('underscore');
 
-var feed = require('./feed');
+var actions = {
+    none:               0,
+    checkout:           1,
+    checkin:            2,
+    pull:               3,
+    acceptPull:         4,
+    rejectPull:         5
+};
 
 // the unit of each ContentHistory element, does not have separate collection in db
-var __ContentHistorySchema = new Schema({
-    uid: String, // uuid of the post
+var __contentHistorySchema = new Schema({
+    uid: String,                                                // uid of the actual document
+    user: String,                                               // a unique identifier for identifying the user
+    version: String,                                            // version number associated with this change
     changed: { type: Date, default: Date.now() },
+    action: Number,                                             // the action that was taken at this point
+    related: [Number],                                         // all _history-s from timeline related to this
+    index: Number
 });
-var __ContentHistory = mongoose.model("__ContentHistorySchema", __ContentHistorySchema);
+var __ContentHistory = mongoose.model("_history", __contentHistorySchema);
 
 // maintain the history of previous versions of content
-var ContentHistorySchema = new Schema({
-    name: { type: String, default: "" }, // has to be unique and linked to the main object in some way
-    versions: [__ContentHistorySchema], // array of pervious version posts
-    toReview: [__ContentHistorySchema], // un-reviewed versions
-    accepted: [__ContentHistorySchema], // history of accepted versions
-    rejected: [__ContentHistorySchema]  // history of rejected versions
+var contentHistorySchema = new Schema({
+    name: { type: String, default: uuid.v4() },                 // has to be unique and linked to the main object in some way
+    owner: String,                                              // owner of this document, all mergeRequsts go to him
+    locked: Boolean,                                            // whether this file is locked (only owner can lock a file)
+    timeline: [__contentHistorySchema],                         // entire timeline of version changes todo: is this a good idea?
+    versions: [Number],                                         // array of pervious versions, points to timeline
+    pullRequests: [Number]                                      // requests to merge documents to create a new version, points to timeline
 });
-mongoose.model("ContentHistorySchema", ContentHistorySchema);
+// contentHistorySchema.index({ name: 1 });
+mongoose.model("history", contentHistorySchema);
 
 
-// accept a toReview version as a new version
-// note: in these methods, the original posts are __not__ removed
-var acceptCommit = function(conn, uid, commit, fn) {
-    if (conn && doc && uid && commit) {
-        var history = conn.model('ContentHistorySchema');
+var checkin = function (conn, user, doc, uniqueId, fn) {
+    conn = conn || mongoose;
 
-        history.find({ name: uid }, function(err, his) {
-            if (his.length) {
-                if (his[0].toReview.length > commit) {
-                    var rev = his[0].toReview[commit];
-                    his[0].toReview.remove(commit);
-                    his[0].versions.push(rev);
-                    his[0].save(fn);
+    var history = conn.model('history');
+    if (doc.versioned) {
+        // if an older version of this document has been supplied to us,
+        // we assume this document to be a newer version based on the older version
+        if (uniqueId) {
+            history.findOne({ name: uniqueId }, function(err, h) {
+                if (h && h.locked) fn('This document is locked');
+                else if (h) {
+                    var ver = bump( _.last(h.timeline).version );
+                    h.timeline.push( new _history({ 
+                        uid: doc._id, 
+                        user: user, 
+                        version: ver, 
+                        action: actions.checkin,
+                        index: h.timeline.length
+                    }) );
+                    h.save(fn);
                 }
-                else fn('No history found for this document');
-            }
-            else fn('Error fetching history of this document');
-        });
-    }
-    else fn && fn('Insufficient parameters');
-};
-
-// reject a toReview version
-var rejectCommit = function(conn, uid, commit, fn) {
-    if (conn && doc && uid && commit) {
-        var history = conn.model('ContentHistorySchema');
-
-        history.find({ name: uid }, function(err, his) {
-            if (his.length) {
-                if (his[0].toReview.length > commit) {
-                    var rev = his[0].toReview[commit];
-                    his[0].toReview.remove(commit);
-                    his[0].rejected.push(rev);
-                    his[0].save(fn);
-                }
-                else fn('No history found for this document');
-            }
-            else fn('Error fetching history of this document');
-        });
-    }
-    else fn && fn('Insufficient parameters');
-};
-
-// delete a versioned commit
-var deleteCommit = function(user, commit, fn) {
-    var history = this.connection.model('ContentHistorySchema');
-
-    history.find({name: this.content.displayname}, function(err, his) {
-        if (his.length) {
-            if (his[0].versions.length >= commit) {
-                var rev = his[0].toReview[commit];
-                his[0].versions.remove(commit);
-                his[0].rejected.push(rev);
-                his[0].save(fn);
-            }
-            else fn('no history found for this document');
+                else fn(err.Message);
+            });
         }
-        else fn('Error fetching history of this document');
+        // otherwise, this is the first time this doc is being checked-in, hurray
+        else {
+            var h = new history({
+                name: doc.versionuid,
+                owner: user,
+                timeline: [ new _history({
+                    uid: doc._id,
+                    user: user,
+                    version: '0.0',
+                    action: actions.checkin,
+                    index: h.timeline.maxlength
+                }) ],
+                versions: [ 0 ]
+            });
+            h.save(fn);
+        }
+    }
+    else fn('The document is not versioned');
+};
+
+var checkout = function (conn, user, uniqueId, lock, fn) {
+    conn = conn || mongoose;
+    lock = lock || false;
+
+    var history = conn.model('history');
+    if (uniqueId) {
+        history.findOne({ name: uniqueId }, function(err, h) {
+            if (h && h.locked) fn('This document is locked');
+            else if (h) {
+                h.timeline.push( new _history({ 
+                    uid: "",
+                    user: user,
+                    version: "",
+                    action: actions.checkout,
+                    index: h.timeline.maxlength
+                }) );
+                if (lock) h.locked = true;
+                // save the request in the document's timeline
+                h.save(function(err, sh) {
+                    if (!err) fn(null, sh.timeline[_.last(sh.versions)]);
+                    else fn('Could not save history');
+                });
+            }
+            else fn('Documents history does not exist');
+        });
+    }
+    else fn('Invalid parameters');
+};
+
+var checkoutAndLock = function (conn, user, uniqueId, fn) {
+    checkout(conn, user, uniqueId, true, fn);
+};
+
+var pullRequest = function(conn, user, uniqueId, fn) {
+    conn = conn || mongoose;
+
+    var history = conn.model('history');
+    history.findOne({ name: uniqueId }, function(err, h) {
+        if (h) {
+            // find all the pull requests that have been accepted for the user
+            var requestsAccpeted = _.filter(h.timeline, function(_h) {
+                return !!(_h.user === user && _h.action === actions.acceptPull);
+            });
+
+            // sort all the accepted pull requests
+            var sortAcceptedPullrequest = _.sortBy(requestsAccpeted, function(r) {
+                return r.changed;
+            });
+
+            // okay so we got the lastaccepted pull request here
+            // next thing we want are all the checkins done by user
+            // after this pull was requested
+            // map last-acc-pull -> pull -> [checkins]
+            var lastAcceptedPullrequest = _.last(sortAcceptedPullrequest);
+            var lastPull = lastAcceptedPullrequest.related;
+            var timeThreshold = lastPull.changed;
+
+            // find all the user's checkins after the last pulled checkin
+            var commitsByUser = _.filter(h.timeline, function(_h) {
+                return !!(_h.user === user &&
+                    _h.action === actions.checkin &&
+                    _h.changed > timeThreshold);
+            });
+            var commits = [];
+            commitsByUser.forEach(function(c) { commits.push(c.index) } );
+
+            h.timeline.push( new _history({
+                uid: "",
+                user: user,
+                version: "",
+                action: actions.pull,
+                related: commits,
+                index: h.timeline.length
+            }) );
+            h.pullRequests.push(h.timeline.length - 1);
+            h.save(fn);
+        }
+        else fn('Documents history does not exist');
+    });  
+};
+
+var acceptPullRequest = function(conn, user, uniqueId, number, fn) {
+    conn = conn || mongoose;
+
+    var history = conn.model('history');
+    history.findOne({ name: uniqueId }, function(err, h) {
+        if (h) {
+            if (h.pullRequests[number]) {
+                var ver = bump( _.last(h.timeline).version );
+                h.timeline.push( new _history({
+                    uid: "",
+                    user: user,
+                    version: ver,
+                    action: actions.acceptPull,
+                    related: [h.pullRequests[number]],
+                    index: h.timeline.length
+                }) );
+                h.versions.push(h.timeline.length - 1);
+                h.pullRequests.remove(number);
+                h.save(fn);
+            }
+            else fn('Documents checkin does not exist');
+        }
+        else fn('Documents history does not exist');
     });
 };
 
-// accept a number of toReview versions and add this as a new version
-var version = function(conn, doc, uid, fn) {
-    if (conn && doc && uid) {
-        var history = conn.model('ContentHistorySchema');
+var rejectPullRequest = function(conn, user, uniqueId, number, fn) {
+    conn = conn || mongoose;
 
-        history.find({ name: uid }, function(err, his) {
-            if (his.length) {
-                // add this's content as a new version
-                his[0].versions.push(new __ContentHistory({ uid: doc._id }));
-                // save the history structure
-                his[0].save(fn);
+    var history = conn.model('history');
+    history.findOne({ name: uniqueId }, function(err, h) {
+        if (h) {
+            if (h.pullRequests[number]) {
+                var ver = bump( _.last(h.timeline).version );
+                h.timeline.push( new _history({
+                    uid: "",
+                    user: user,
+                    version: ver,
+                    action: actions.rejectPull,
+                    related: [h.pullRequests[number]],
+                    index: h.timeline.length
+                }) );
+                h.pullRequests.remove(number);
+                h.save(fn);
             }
-            else fn('Error fetching history of this document');
-        });
-    }
-    else fn && fn('Insufficient parameters');
+            else fn('Documents checkin does not exist');
+        }
+        else fn('Documents history does not exist');
+    });
 };
 
-var newCommit = function(conn, doc, uid, fn) {
-    if (conn && doc && uid) {
-        var history = conn.model('ContentHistorySchema');
+var getHistory = function(conn, uniqueId, user, fn) {
+    conn = conn || mongoose;
 
-        history.find({ name: uid }, function(err, his) {
-            if (!his.length) {
-                // the history for this document does not exist, create a new one
-                var newhistory = new history({});
-                newhistory.name = uid;
-                // policy: first commit is a new version, not a toReview
-                newhistory.versions = [new __ContentHistory({ uid: doc._id })];
-                newhistory.toReview = [];
-                newhistory.save(fn);
-            }
-            else {
-                // okay, so history exists, add this bare commit to toReview
-                his[0].toReview.push(new __ContentHistory({ uid: doc._id}));
-                his[0].save(fn);
-            }
-        });
-    }
-    else fn && fn('Insufficient parameters');
+    var history = conn.model('history');
+    history.findOne({ name: uniqueId }, function(err, h) {
+        if (h) {
+            fn(null,_.filter(h.timeline, function(_h) {
+                return !!(_h.user === user);
+            }));
+        }
+        else fn('Documents checkin does not exist');
+    });
 };
 
-var getHistory = function(conn, uid, fn) {
-    if (conn && uid) {
-        history.find({ name: uid }, function(err, his) {
-            if (his.length) {
-                var hist = his[0];
+var getFullHistory = function(conn, uniqueId, user, fn) {
+    conn = conn || mongoose;
 
-                //sanitize all _ids and other mongoDB stuff if any
-                delete hist[_id];
-                for (var key in hist.versions)
-                    if (hist.versions.hasOwnProperty(key))
-                        if (key === '_id' || key === '__v')
-                            delete hist.versions[key];
-                for (var key in hist.toReview)
-                    if (hist.versions.hasOwnProperty(key))
-                        if (key === '_id' || key === '__v')
-                            delete hist.versions[key];
-                for (var key in hist.accepted)
-                    if (hist.versions.hasOwnProperty(key))
-                        if (key === '_id' || key === '__v')
-                            delete hist.versions[key];
-                for (var key in hist.rejected)
-                    if (hist.versions.hasOwnProperty(key))
-                        if (key === '_id' || key === '__v')
-                            delete hist.versions[key];
-
-                fn(null, hist);
-            }
-            else fn('Error fetching history of this document');
-        });
-    }
-    else fn && fn('Insufficient parameters');
+    var history = conn.model('history');
+    history.findOne({ name: uniqueId }, function(err, h) {
+        if (h) {
+            fn(null, h.timeline);
+        }
+        else fn('Documents checkin does not exist');
+    });
 };
 
-//var preSave = function(next, done) {
-//    // nothing
-//};
-//
-//var postSave = function(doc){
-//    // if the document is versioned, document the recent history
-//    if (doc.versioned) {
-//        newCommit(doc, function(err) {
-//            log('err', 'Could not save history: ' + err.message);
-//        });
-//    }
-//};
-
-var history = function(schema, defaultEnabled) {
-    // add these field to the schema
+var History = function(schema) {
+    // add these fields to the schema
     // versioned: indicates whether a document is versioned
-    // versionuuid: indicates points to the document's contentHistory
-    schema.add({ versioned: { type: Boolean, default: (defaultEnabled || false) } });
-    schema.add({ versionuuid: { type: String, default: "" } });
+    // versionuid: points to the document's contentHistory
+    schema.add({ versioned: { type: Boolean, default: false } });
+    schema.add({ versionuid: { type: String } });
 
     // add these schema methods
-    schema.methods.addToReview = newCommit;
-    schema.methods.acceptReview = acceptCommit;
-    schema.methods.rejectReview = rejectCommit;
-    schema.methods.version = version;
-    schema.methods.deleteVersion = deleteCommit;
+    schema.methods.checkin = checkin;
+    schema.methods.checkout = checkout;
+    schema.methods.checkoutAndLock = checkoutAndLock;
+//    schema.methods.checkinAndUnlock = checkinAndUnlock;
+    schema.methods.pullRequest = pullRequest;
+    schema.methods.acceptPullRequest = acceptPullRequest;
+    schema.methods.rejectPullRequest = rejectPullRequest;
     schema.methods.getHistory = getHistory;
+    schema.methods.getFullHistory = getFullHistory;
 
     // schema middleware: bad idea :(
 //    schema.pre('save', preSave);
@@ -218,11 +288,14 @@ var history = function(schema, defaultEnabled) {
 };
 
 // enable versioning for a document
-history.prototype.enableHistory = function(document) {
-    document.versioned = true;
-    document.versionuuid = uuid.v4();
+// uniqueId can be constructed for e.g. as a virtual of the schema (e.g. like a unix path)
+History.prototype.enableHistory = function(document, uniqueId) {
+    if (document && uniqueId) {
+        document.versioned = true;
+        document.versionuid = uniqueId;
+    }
 };
 
 // extend the schemas with history functions
-module.exports = exports = history;
+module.exports = exports = History;
 
