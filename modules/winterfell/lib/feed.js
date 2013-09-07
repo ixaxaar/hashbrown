@@ -158,8 +158,7 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
         } else if (json.belongs) {
             json.belongs.forEach(function(t) {
                 // policy: only add teams that the user himself belongs to
-                if(_.indexOf(user.teams, t) != -1)
-                    that.teams.push(t);
+                if(_.indexOf(user.teams, t) != -1) that.teams.push(t);
             });
         }
 
@@ -185,14 +184,98 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
 
         // commit to DB
         this.save(function(err, t) {
-            if (!err && t)  {
-                that.checkin(null, user.uid, t, t.path, function(err) { console.log("done") });
-                fn(true, { "uuid": t.uuid });
-            }
+            if (!err && t) fn(true, t);
             else fn(false, 'Could not save ' + err.message);
         });
     }
     else fn(false, 'Request format is wrong');
+};
+
+/** JSON request structure:
+ {
+     "content": "",        // markdown
+     "file": "",            // filename to be uploaded
+     "mime": "",           // file mime type http://stackoverflow.com/questions/4581308/jquery-or-javascript-get-mime-type-from-url
+     "name": ""             // display name of the file
+     "location": ""         // location of the file
+     "belongs": [],        // team (optional if private)
+     "mentions": [],        // array of user's uids (optional)
+     "private": "",        // boolean - private or public post
+     "tags": [],           // optional - tags for faster searching
+     "versioned": ""       // optional, boolean
+     "associations": ""    // associations, request from different module
+     "historyId": ""       // unique Id of the actual document
+ }
+ Output:
+ {
+    "uuid" : ""            // uuid of the new post
+ }
+ */
+FeedSchema.methods.Checkin = function(user, json, fn) {
+    this.CreateFeed(user, json, function(stat, f) {
+        if (stat) {
+            // note: if the historyId is missing implies that this is a
+            // first-time checkin
+            json.historyId = json.historyId || f.path;
+            this.__checkin(null, user, f, json.historyId, function(err, h) {
+                if (!err) fn(true, {feed: f, history: h});
+                else fn(false, err);
+            });
+        }
+        else fn(stat, f);
+    });
+};
+
+FeedSchema.methods.Checkout = function(user, json, fn) {
+    this.__checkout(null, user, this, this.path, false, function(err, h) {
+        if (!err) fn(true, h);
+        else fn(false, err);
+    });
+};
+
+FeedSchema.methods.PullRequest = function(user, json, fn) {
+    this.__pullRequest(null, user, this.path, function(err, ret) {
+        if (!err) fn(true, ret);
+        else fn(false, err);
+    });
+};
+
+FeedSchema.methods.AcceptPull = function(user, json, fn) {
+    if (this.owner === user.uid)
+        this.__acceptPullRequest(null, user, this.path, json.number,
+            function(err, ret) {
+                if (!err) fn(true, ret);
+                else fn(false, err);
+            });
+    else fn(false, 'User does not have permission to do that');
+};
+
+FeedSchema.methods.RejectPull = function(user, json, fn) {
+    if (this.owner === user.uid)
+        this.__rejectPullRequest(null, user, this.path, json.number,
+            function(err, ret) {
+                if (!err) fn(true, ret);
+                else fn(false, err);
+            });
+    else fn(false, 'User does not have permission to do that');
+};
+
+FeedSchema.methods.GetHistory = function(user, json, fn) {
+    this.__getHistory(null, user, this.path,
+        function(err, ret) {
+            if (!err) fn(true, ret);
+            else fn(false, err);
+        }
+    );
+};
+
+FeedSchema.methods.GetFullHistory = function(user, json, fn) {
+    this.__getFullHistory(null, user, this.path,
+        function(err, ret) {
+            if (!err) fn(true, ret);
+            else fn(false, err);
+        }
+    );
 };
 
 /** JSON request structure:

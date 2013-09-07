@@ -29,17 +29,18 @@ var createFeedSchema = {
         "mentions": {
             "type": "array",
             "items": { "type": "string"}
-        }
-    },
-    "private": { "type": "string" },
-    "tags": {
-        "type": "array",
-        "items": { "type": "string"}
-    },
-    "versioned": { "type": "boolean" },
-    "associations": {
-        "type": "array",
-        "items": { "type": "string"}
+        },
+        "private": { "type": "boolean" },
+        "tags": {
+            "type": "array",
+            "items": { "type": "string"}
+        },
+        "versioned": { "type": "boolean" },
+        "associations": {
+            "type": "array",
+            "items": { "type": "string"}
+        },
+        "historyId": { "type": "string" }
     }
 };
 v.addSchema(createFeedSchema, '/createFeedSchema');

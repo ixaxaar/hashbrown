@@ -280,16 +280,16 @@ var History = function(schema) {
     schema.add({ versionuid: { type: String } });
 
     // add these schema methods
-    schema.methods.checkin              = checkin;
-    schema.methods.checkout             = checkout;
-    schema.methods.checkoutAndLock      = checkoutAndLock;
-//    schema.methods.checkinAndUnlock     = checkinAndUnlock;
-    schema.methods.pullRequest          = pullRequest;
-    schema.methods.acceptPullRequest    = acceptPullRequest;
-    schema.methods.rejectPullRequest    = rejectPullRequest;
-    schema.methods.getHistory           = getHistory;
-    schema.methods.getFullHistory       = getFullHistory;
-    schema.methods.enableHistory        = enableHistory;
+    schema.methods.__checkin              = checkin;
+    schema.methods.__checkout             = checkout;
+    schema.methods.__checkoutAndLock      = checkoutAndLock;
+//    schema.methods.__checkinAndUnlock     = checkinAndUnlock;
+    schema.methods.__pullRequest          = pullRequest;
+    schema.methods.__acceptPullRequest    = acceptPullRequest;
+    schema.methods.__rejectPullRequest    = rejectPullRequest;
+    schema.methods.__getHistory           = getHistory;
+    schema.methods.__getFullHistory       = getFullHistory;
+    schema.methods.__enableHistory        = enableHistory;
 
     // schema middleware: bad idea :(
 //    schema.pre('save', preSave);

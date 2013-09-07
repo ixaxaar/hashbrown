@@ -66,6 +66,53 @@ var feedRequestRouter = function(req, res, next) {
                     F.CreateFeed(req.user, req.body.body, respond);
                     break;
 
+                case 'checkinfeed':
+                    var F = new feed.Feed({});
+                    F.Checkin(req.user, req.body.body, respond);
+                    break;
+
+                case 'checkoutfeed':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.Checkout(req.user, req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
+                case 'pullrequest':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.PullRequest(req.user, req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
+                case 'acceptpull':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.AcceptPull(req.user, req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
+                case 'rejectpull':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.RejectPull(req.user, req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
+                case 'gethistory':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.GetHistory(req.user, req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
+                case 'getfullhistory':
+                    feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
+                        if (!err && f) f.GetFullHistory(req.user, req.body.body, respond);
+                        else respond(false, 'Feed not found');
+                    });
+                    break;
+
                 case 'newchildfeed':
                     feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
                         if (!err && f) f.AddChild(req.user, req.body.body, respond);
