@@ -104,6 +104,13 @@ var FeedSchema = new Schema({
 FeedSchema.index({ owner: 1, updated: -1 });
 FeedSchema.index({ teams: 1 });
 
+// this is a virtual unix-style filesystem path for this feed
+// can be used to uniquely identify this feed'S file
+FeedSchema.virtual("path")
+    .get(function() {
+        return "/" + this.org + "/" + this.owner + "/" + this.content[0].displayname;
+    });
+
 // add history support for these feeds
 history(FeedSchema);
 
@@ -171,12 +178,17 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
             });
         });
 
-        this.versioned = json.versioned             || false;
+          // todo: incorporate this when done testing - versioning is for files only
+//        if (this.file)
+            this.versioned = json.versioned || false;
         this.associations = json.associations       || {};
 
         // commit to DB
         this.save(function(err, t) {
-            if (!err || t) fn(true, { "uuid": t.uuid });
+            if (!err && t)  {
+                that.checkin(null, user.uid, t, t.path, function(err) { console.log("done") });
+                fn(true, { "uuid": t.uuid });
+            }
             else fn(false, 'Could not save ' + err.message);
         });
     }

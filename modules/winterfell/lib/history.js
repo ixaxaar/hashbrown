@@ -41,13 +41,13 @@ var actions = {
 var __contentHistorySchema = new Schema({
     uid: String,                                                // uid of the actual document
     user: String,                                               // a unique identifier for identifying the user
-    version: String,                                            // version number associated with this change
+    version: Number,                                            // version number associated with this change
     changed: { type: Date, default: Date.now() },
     action: Number,                                             // the action that was taken at this point
     related: [Number],                                         // all _history-s from timeline related to this
     index: Number
 });
-var __ContentHistory = mongoose.model("_history", __contentHistorySchema);
+var _history = mongoose.model("_history", __contentHistorySchema);
 
 // maintain the history of previous versions of content
 var contentHistorySchema = new Schema({
@@ -59,16 +59,17 @@ var contentHistorySchema = new Schema({
     pullRequests: [Number]                                      // requests to merge documents to create a new version, points to timeline
 });
 // contentHistorySchema.index({ name: 1 });
-mongoose.model("history", contentHistorySchema);
+var history = mongoose.model("history", contentHistorySchema);
 
+var bump = function(ver) {
+    return ver + 1;
+};
 
 var checkin = function (conn, user, doc, uniqueId, fn) {
     conn = conn || mongoose;
 
     var history = conn.model('history');
     if (doc.versioned) {
-        // if an older version of this document has been supplied to us,
-        // we assume this document to be a newer version based on the older version
         if (uniqueId) {
             history.findOne({ name: uniqueId }, function(err, h) {
                 if (h && h.locked) fn('This document is locked');
@@ -76,32 +77,32 @@ var checkin = function (conn, user, doc, uniqueId, fn) {
                     var ver = bump( _.last(h.timeline).version );
                     h.timeline.push( new _history({ 
                         uid: doc._id, 
-                        user: user, 
+                        user: user,
                         version: ver, 
                         action: actions.checkin,
                         index: h.timeline.length
                     }) );
                     h.save(fn);
                 }
-                else fn(err.Message);
+                // otherwise, this is the first time this doc is being checked-in, hurray
+                else {
+                    var h = new history({
+                        name: uniqueId,
+                        owner: user,
+                        timeline: [ new _history({
+                            uid: doc._id,
+                            user: user,
+                            version: 0,
+                            action: actions.checkin,
+                            index: 0
+                        }) ],
+                        versions: [ 0 ]
+                    });
+                    h.save(fn);
+                }
             });
         }
-        // otherwise, this is the first time this doc is being checked-in, hurray
-        else {
-            var h = new history({
-                name: doc.versionuid,
-                owner: user,
-                timeline: [ new _history({
-                    uid: doc._id,
-                    user: user,
-                    version: '0.0',
-                    action: actions.checkin,
-                    index: h.timeline.maxlength
-                }) ],
-                versions: [ 0 ]
-            });
-            h.save(fn);
-        }
+        else fn('No uniqueId supplied');
     }
     else fn('The document is not versioned');
 };
@@ -264,6 +265,13 @@ var getFullHistory = function(conn, uniqueId, user, fn) {
     });
 };
 
+var enableHistory = function(uniqueId) {
+    if (uniqueId) {
+        this.versioned = true;
+        this.versionuid = uniqueId;
+    }
+};
+
 var History = function(schema) {
     // add these fields to the schema
     // versioned: indicates whether a document is versioned
@@ -272,15 +280,16 @@ var History = function(schema) {
     schema.add({ versionuid: { type: String } });
 
     // add these schema methods
-    schema.methods.checkin = checkin;
-    schema.methods.checkout = checkout;
-    schema.methods.checkoutAndLock = checkoutAndLock;
-//    schema.methods.checkinAndUnlock = checkinAndUnlock;
-    schema.methods.pullRequest = pullRequest;
-    schema.methods.acceptPullRequest = acceptPullRequest;
-    schema.methods.rejectPullRequest = rejectPullRequest;
-    schema.methods.getHistory = getHistory;
-    schema.methods.getFullHistory = getFullHistory;
+    schema.methods.checkin              = checkin;
+    schema.methods.checkout             = checkout;
+    schema.methods.checkoutAndLock      = checkoutAndLock;
+//    schema.methods.checkinAndUnlock     = checkinAndUnlock;
+    schema.methods.pullRequest          = pullRequest;
+    schema.methods.acceptPullRequest    = acceptPullRequest;
+    schema.methods.rejectPullRequest    = rejectPullRequest;
+    schema.methods.getHistory           = getHistory;
+    schema.methods.getFullHistory       = getFullHistory;
+    schema.methods.enableHistory        = enableHistory;
 
     // schema middleware: bad idea :(
 //    schema.pre('save', preSave);
