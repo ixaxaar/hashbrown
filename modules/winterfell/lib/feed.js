@@ -115,7 +115,7 @@ history(FeedSchema);
      "name": ""             // display name of the file
      "location": ""         // location of the file
      "belongs": [],        // team (optional if private)
-     "mentions": [],        // array of user's uuids (optional)
+     "mentions": [],        // array of user's uids (optional)
      "private": "",        // boolean - private or public post
      "tags": [],           // optional - tags for faster searching
      "versioned": ""       // optional, boolean
@@ -166,7 +166,7 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
         // add all those who were mentioned to this feed's acl
         if (json.mentions) json.mentions.forEach(function(m) {
             // note: covered query
-            user.model("UserSchema").findOne({ uid: m }, { uid: 1 }, function(err, u) {
+            framework.findUserbyuid(m, function(err, u) {
                 if (!err && u) that.acl.push(u.uid);
             });
         });
