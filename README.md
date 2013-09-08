@@ -6,7 +6,7 @@ Tested APIs:
 =========
 
 
-Control & Heirarical Management:
+Control & Hierarchical Management:
 =========
 
 1. Login:
