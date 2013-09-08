@@ -179,7 +179,11 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
 
           // todo: incorporate this when done testing - versioning is for files only
 //        if (this.file)
-            this.versioned = json.versioned || false;
+        if (json.versioned) //history.enableHistory(this, this.path);
+        {
+            this.versioned = true;
+            this.versionuid = json.historyId || this.path;
+        }
         this.associations = json.associations       || {};
 
         // commit to DB
@@ -212,12 +216,14 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
  }
  */
 FeedSchema.methods.Checkin = function(user, json, fn) {
+    var that = this;
+
     this.CreateFeed(user, json, function(stat, f) {
         if (stat) {
             // note: if the historyId is missing implies that this is a
             // first-time checkin
             json.historyId = json.historyId || f.path;
-            this.__checkin(null, user, f, json.historyId, function(err, h) {
+            that.__checkin(null, user.uid, f, json.historyId, function(err, h) {
                 if (!err) fn(true, {feed: f, history: h});
                 else fn(false, err);
             });
@@ -227,41 +233,40 @@ FeedSchema.methods.Checkin = function(user, json, fn) {
 };
 
 FeedSchema.methods.Checkout = function(user, json, fn) {
-    this.__checkout(null, user, this, this.path, false, function(err, h) {
-        if (!err) fn(true, h);
-        else fn(false, err);
+    this.__checkout(null, user.uid, json.historyId, false, function(err, h) {
+        if (!err && h.uid != '') Feed.findById(h.uid, function(err, cf) {
+            if (!err && cf) fn(true, cf);
+            else fn(false, err);
+        });
+        else fn(false, err || 'Last checked-in instance is a problem');
     });
 };
 
 FeedSchema.methods.PullRequest = function(user, json, fn) {
-    this.__pullRequest(null, user, this.path, function(err, ret) {
+    this.__pullRequest(null, user.uid, json.historyId, function(err, ret) {
         if (!err) fn(true, ret);
         else fn(false, err);
     });
 };
 
 FeedSchema.methods.AcceptPull = function(user, json, fn) {
-    if (this.owner === user.uid)
-        this.__acceptPullRequest(null, user, this.path, json.number,
-            function(err, ret) {
-                if (!err) fn(true, ret);
-                else fn(false, err);
-            });
-    else fn(false, 'User does not have permission to do that');
+    this.__acceptPullRequest(null, user.uid, json.historyId, json.number,
+        function(err, ret) {
+            if (!err) fn(true, ret);
+            else fn(false, err);
+    });
 };
 
 FeedSchema.methods.RejectPull = function(user, json, fn) {
-    if (this.owner === user.uid)
-        this.__rejectPullRequest(null, user, this.path, json.number,
-            function(err, ret) {
-                if (!err) fn(true, ret);
-                else fn(false, err);
-            });
-    else fn(false, 'User does not have permission to do that');
+    this.__rejectPullRequest(null, user.uid, json.historyId, json.number,
+        function(err, ret) {
+            if (!err) fn(true, ret);
+            else fn(false, err);
+    });
 };
 
 FeedSchema.methods.GetHistory = function(user, json, fn) {
-    this.__getHistory(null, user, this.path,
+    this.__getHistory(null, user.uid, json.historyId,
         function(err, ret) {
             if (!err) fn(true, ret);
             else fn(false, err);
@@ -270,7 +275,7 @@ FeedSchema.methods.GetHistory = function(user, json, fn) {
 };
 
 FeedSchema.methods.GetFullHistory = function(user, json, fn) {
-    this.__getFullHistory(null, user, this.path,
+    this.__getFullHistory(null, user.uid, json.historyId,
         function(err, ret) {
             if (!err) fn(true, ret);
             else fn(false, err);

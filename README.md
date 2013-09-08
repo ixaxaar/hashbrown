@@ -1,8 +1,13 @@
-Project Hash Brown
+Project HashBrown
 =========
 
 
 Tested APIs:
+=========
+
+
+Control & Heirarical Management:
+=========
 
 1. Login:
 http://localhost:3000/login
@@ -161,7 +166,122 @@ http://localhost:3000/team
 }
 ```
 
-Response schema validator is:
+Winterfell APIs:
+=========
+
+1. Create a feed
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"newfeed",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "content": "blahblah4",
+	        "belongs": ["t1@org1"],
+	        "tags": ["first", "second"],
+	        "private": true,
+	        "mentions": ["god"],
+	        "versioned": true
+	}
+}
+```
+
+2. Check-in a feed
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"checkinfeed",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "content": "blahblah666",
+	        "belongs": ["t1@org1"],
+	        "tags": ["first", "second"],
+	        "private": true,
+	        "mentions": ["god"],
+	        "versioned": true,
+	        "name": "wee",
+	        "historyId": "/God/god/wee"
+	}
+}
+```
+3. Check-out a feed
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"checkoutfeed",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "historyId": "/God/god/wee"
+	}
+}
+```
+
+4. Request a pull for the feed:
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"pullrequest",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "historyId": "/God/god/test"
+	}
+}
+```
+
+5. Accept a pull request:
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"acceptpull",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "historyId": "/God/god/test",
+	        "number": "2"
+	}
+}
+```
+
+6. Reject a pull request:
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"rejectpull",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "historyId": "/God/god/oo",
+	        "number": 0
+	}
+}
+```
+
+7. Get this user's history with this feed
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"gethistory",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "historyId": "/God/god/oo"
+	}
+}
+```
+
+8. Get all history of this feed
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"getfullhistory",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "historyId": "/God/god/wee"
+	}
+}
+```
+
+
+Response schema validator:
+=========
+
 
 ```Javascript
 var resultConstructorValidatorSchema = {
@@ -183,6 +303,7 @@ var resultConstructorValidatorSchema = {
     }
 };
 ```
+
 
 P.S.
 Every feed has "uuid" field which can be used by frontend to verify the response.

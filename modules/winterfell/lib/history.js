@@ -21,12 +21,22 @@
 //    THE SOFTWARE.
 
 
-var mongoose = require('mongoose')
-    , Schema = mongoose.Schema
+var goose = require('mongoose')
+    , Schema = goose.Schema
     , ObjectId = Schema.ObjectId;
+
+var mongoose = goose.createConnection('mongodb://localhost/history');
 
 var uuid = require('node-uuid');
 var _ = require('underscore');
+
+
+// Array Remove - By John Resig (MIT Licensed)
+Array.prototype.r2d2 = function(from, to) {
+    var rest = this.slice((to || from) + 1 || this.length);
+    this.length = from < 0 ? this.length + from : from;
+    return this.push.apply(this, rest);
+};
 
 var actions = {
     none:               0,
@@ -47,19 +57,19 @@ var __contentHistorySchema = new Schema({
     related: [Number],                                         // all _history-s from timeline related to this
     index: Number
 });
-var _history = mongoose.model("_history", __contentHistorySchema);
+var _history = goose.model("_history", __contentHistorySchema);
 
 // maintain the history of previous versions of content
 var contentHistorySchema = new Schema({
     name: { type: String, default: uuid.v4() },                 // has to be unique and linked to the main object in some way
     owner: String,                                              // owner of this document, all mergeRequsts go to him
-    locked: Boolean,                                            // whether this file is locked (only owner can lock a file)
     timeline: [__contentHistorySchema],                         // entire timeline of version changes todo: is this a good idea?
+    pullRequests: [Number],                                     // requests to merge documents to create a new version, points to timeline
     versions: [Number],                                         // array of pervious versions, points to timeline
-    pullRequests: [Number]                                      // requests to merge documents to create a new version, points to timeline
+    locked: Boolean                                             // whether this file is locked (only owner can lock a file)
 });
 // contentHistorySchema.index({ name: 1 });
-var history = mongoose.model("history", contentHistorySchema);
+var history = goose.model("history", contentHistorySchema);
 
 var bump = function(ver) {
     return ver + 1;
@@ -160,9 +170,9 @@ var pullRequest = function(conn, user, uniqueId, fn) {
             // next thing we want are all the checkins done by user
             // after this pull was requested
             // map last-acc-pull -> pull -> [checkins]
-            var lastAcceptedPullrequest = _.last(sortAcceptedPullrequest);
-            var lastPull = lastAcceptedPullrequest.related;
-            var timeThreshold = lastPull.changed;
+            var lastAcceptedPullrequest = _.last(sortAcceptedPullrequest) || {};
+            var lastPull = h.timeline[lastAcceptedPullrequest.related] || {};
+            var timeThreshold = lastPull.changed || 0;
 
             // find all the user's checkins after the last pulled checkin
             var commitsByUser = _.filter(h.timeline, function(_h) {
@@ -181,7 +191,7 @@ var pullRequest = function(conn, user, uniqueId, fn) {
                 related: commits,
                 index: h.timeline.length
             }) );
-            h.pullRequests.push(h.timeline.length - 1);
+            h.pullRequests.push((h.timeline.length - 1));
             h.save(fn);
         }
         else fn('Documents history does not exist');
@@ -194,18 +204,27 @@ var acceptPullRequest = function(conn, user, uniqueId, number, fn) {
     var history = conn.model('history');
     history.findOne({ name: uniqueId }, function(err, h) {
         if (h) {
-            if (h.pullRequests[number]) {
+            var index = h.pullRequests[number];
+            if (index) {
+                // yes, this is hokus-pokus to delete an array element and
+                // for mongoose to realize that the array has changes
+                // markModified sounds good but does not work here.
+                var off = h.pullRequests.length - number;
+                var popped = [];
+                while(off--) popped.push(h.pullRequests.pop());
+                popped.pop();
+                while(popped.length) h.pullRequests.push(popped.pop());
+
                 var ver = bump( _.last(h.timeline).version );
                 h.timeline.push( new _history({
                     uid: "",
                     user: user,
                     version: ver,
                     action: actions.acceptPull,
-                    related: [h.pullRequests[number]],
+                    related: [index],
                     index: h.timeline.length
                 }) );
                 h.versions.push(h.timeline.length - 1);
-                h.pullRequests.remove(number);
                 h.save(fn);
             }
             else fn('Documents checkin does not exist');
@@ -220,17 +239,26 @@ var rejectPullRequest = function(conn, user, uniqueId, number, fn) {
     var history = conn.model('history');
     history.findOne({ name: uniqueId }, function(err, h) {
         if (h) {
-            if (h.pullRequests[number]) {
+            var index = h.pullRequests[number];
+            if (index) {
+                // yes, this is hokus-pokus to delete an array element and
+                // for mongoose to realize that the array has changes
+                // markModified sounds good but does not work here.
+                var off = h.pullRequests.length - number;
+                var popped = [];
+                while(off--) popped.push(h.pullRequests.pop());
+                popped.pop();
+                while(popped.length) h.pullRequests.push(popped.pop());
+
                 var ver = bump( _.last(h.timeline).version );
                 h.timeline.push( new _history({
                     uid: "",
                     user: user,
                     version: ver,
-                    action: actions.rejectPull,
-                    related: [h.pullRequests[number]],
+                    action: actions.acceptPull,
+                    related: [index],
                     index: h.timeline.length
                 }) );
-                h.pullRequests.remove(number);
                 h.save(fn);
             }
             else fn('Documents checkin does not exist');
@@ -239,7 +267,7 @@ var rejectPullRequest = function(conn, user, uniqueId, number, fn) {
     });
 };
 
-var getHistory = function(conn, uniqueId, user, fn) {
+var getHistory = function(conn, user, uniqueId, fn) {
     conn = conn || mongoose;
 
     var history = conn.model('history');
@@ -253,7 +281,7 @@ var getHistory = function(conn, uniqueId, user, fn) {
     });
 };
 
-var getFullHistory = function(conn, uniqueId, user, fn) {
+var getFullHistory = function(conn, user, uniqueId, fn) {
     conn = conn || mongoose;
 
     var history = conn.model('history');
