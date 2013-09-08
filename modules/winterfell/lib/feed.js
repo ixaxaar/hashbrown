@@ -14,6 +14,7 @@ var framework = require('../../../framework'),
 var validation = require('./validation')
     , validate = validation.validate
     , createFeedSchema = validation.createFeedSchema
+    , addChildSchema = validation.addChildSchema
     , removeChildValidationSchema = validation.removeChildValidationSchema
     , removeFeedValidationSchema = validation.removeFeedValidationSchema;
 
@@ -22,7 +23,7 @@ var validation = require('./validation')
 ////////////////////////////////
 
 // Array Remove - By John Resig (MIT Licensed)
-Array.prototype.remove = function(from, to) {
+Array.prototype.remove = Array.prototype.r2d2 = function(from, to) {
     var rest = this.slice((to || from) + 1 || this.length);
     this.length = from < 0 ? this.length + from : from;
     return this.push.apply(this, rest);
@@ -171,7 +172,6 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
 
         // add all those who were mentioned to this feed's acl
         if (json.mentions) json.mentions.forEach(function(m) {
-            // note: covered query
             framework.findUserbyuid(m, function(err, u) {
                 if (!err && u) that.acl.push(u.uid);
             });
@@ -296,11 +296,11 @@ FeedSchema.methods.Delete = function(user, json, fn) {
     if (validate(json, removeFeedValidationSchema)) {
         var u = this.uuid;
         this.remove(function(err) {
-            if (!err) fn(null, { "uuid": u });
-            else fn('Could not remove');
+            if (!err) fn(true, { "uuid": u });
+            else fn(false, 'Could not remove');
         });
     }
-    else fn('Request format is wrong');
+    else fn(false, 'Request format is wrong');
 };
 
 /** JSON request structure:
@@ -327,22 +327,23 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
         var that = this;
         if (json.mentions) json.mentions.forEach(function(m) {
             // make sure this query is covered
-            user.model("UserSchema").findOne({ uid: m }, { uid: 1 }, function(err, u) {
+            framework.findUserbyuid(m, function(err, u) {
                 // policy: we add the mentions in each sub-post to the main post:
                 // afa security is concerned, this implies a friend-of-friend kind
                 // of open-ness facilitating inter-team discussions
-                if (!err && u) that.acl.push(u.uid);
+                if (!err && u && !_.contains(that.acl, u.uid))
+                    that.acl.push(u.uid);
             });
         });
 
         this.children.push(c);
         this.modified = Date.now();
         this.save(function(err, f) {
-            if (!err || f) fn(null, { "uuid": c.uuid });
-            else fn('Could not add child feed', null);
+            if (!err || f) fn(true, f);
+            else fn(false, 'Could not add child feed');
         });
     }
-    else fn('Request format is wrong');
+    else fn(false, 'Request format is wrong');
 };
 
 /** JSON request structure:
@@ -356,21 +357,32 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
  }
  */
 FeedSchema.methods.removeChild = function(json, fn) {
+    var that = this;
     if (validate(json, removeChildValidationSchema)) {
         var ctr = 0;
         var done = false;
-        this.children.forEach(function(c) {
-            if (c.uuid == json.childuuid) {
-                done = true;
-                c.remove(ctr);
-                c.save(fn);
+        console.log(that.children.length)
+        that.children.forEach(function(c) {
+            if (c.uuid === json.childuuid) {
+                done++;
+                var off = that.children.length - ctr;
+                var popped = [];
+                while(off--) popped.push(that.children.pop());
+                popped.pop();
+                while(popped.length) that.children.push(popped.pop());
+                that.save(function(err, st) {
+                    if (!err) fn(true, st);
+                    else fn(false, 'Could not delete child feed');
+                });
+                return;
             }
             ctr++;
         });
 
-        if (!done) fn('Could not find child', null);
+        console.log(done);
+        if (!done) fn(false, 'Could not find child');
     }
-    else fn('Request format is wrong');
+    else fn(false, 'Request format is wrong');
 };
 
 var Feed = mongoose.model("FeedSchema", FeedSchema);
@@ -387,25 +399,27 @@ var findFeed = function(asker, uuid, fn) {
     // see if this feed belongs to the asker himself
     // this kind of queries is more probable and we can serve
     // it in lesser time as 'owner' is indexed
-    Feed.find({})
-    .where('owner').equals(asker.uid)
-    .where('uuid').equals(uuid)
-    .exec(function(err, f) {
-            if (!err && f) {
-                fn(null, f);
-                found = true;
-            }
-        });
+    Feed.findOne({ uuid: uuid }, fn);
 
-    // fall-back to thew brute-force way
-    if (!found) Feed.find({})
-        .where('uuid').equals(uuid)
-        .exec(function(err, f) {
-            if (!err && f) {
-                fn(null, f);
-                found = true;
-            } else fn('Could not find feed');
-        });
+//    Feed.find({})
+//    .where('owner').equals(asker.uid)
+//    .where('uuid').equals(uuid)
+//    .exec(function(err, f) {
+//            if (!err && f) {
+//                fn(null, f);
+//                found = true;
+//            }
+//        });
+//
+//    // fall-back to thew brute-force way
+//    if (!found) Feed.find({})
+//        .where('uuid').equals(uuid)
+//        .exec(function(err, f) {
+//            if (!err && f) {
+//                fn(null, f);
+//                found = true;
+//            } else fn('Could not find feed');
+//        });
 };
 exports.findFeed = findFeed;
 

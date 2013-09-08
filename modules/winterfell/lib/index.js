@@ -110,7 +110,7 @@ var feedRequestRouter = function(req, res, next) {
 
                 case 'deletefeed':
                     feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
-                        if (!err && f) f.Delete(respond);
+                        if (!err && f) f.Delete(req.user, req.body.body, respond);
                         else respond(false, 'Feed not found');
                     });
                     break;

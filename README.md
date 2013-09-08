@@ -278,6 +278,45 @@ http://localhost:3000/winterfell/feed
 }
 ```
 
+9. Delete a feed:
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"deletefeed",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "uuid" : "9d010fa4-7dff-4660-b701-3d4cd3938d44"
+	}
+}
+```
+
+10. Create a new child feed (comment):
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"newchildfeed",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "uuid" : "f2752f32-b9b8-429e-85f3-5e1448d72f07",
+                "content": "ysvksdgiuvksbiyghkb",
+                "mentions": ["god"]
+	}
+}
+```
+
+11. Delete a child feed:
+http://localhost:3000/winterfell/feed
+```JSON
+{
+	"request":"deletechildfeed",
+	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+	"body": {
+	        "uuid" : "c8a7f257-8863-4002-b21d-3c5694a0e4e8",
+                "childuuid": "75711bed-4137-46ed-bb38-b1d6d362c126"
+	}
+}
+```
+
 
 Response schema validator:
 =========

@@ -54,7 +54,7 @@ var addChildSchema = {
         "content": { "type": "string", "required": "true" },
         "mentions": {
             "type": "array",
-            "items": "string"
+            "items": { "type": "string" }
         }
     }
 };
