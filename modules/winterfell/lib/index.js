@@ -134,8 +134,43 @@ var feedRequestRouter = function(req, res, next) {
 //    }
 };
 
+
+var userFeedRequestRouter = function(req, res, next) {
+    req.accepts('application/json');
+
+//    try {
+    var respond = function(result, msg) {
+        result = !!result;
+        if (!msg) msg = result;
+
+        requestResponder(req, res, result, msg);
+    };
+
+    if (validate(req.body, requestValidatorSchema))
+        switch(req.body.request) {
+
+            case 'getfeeds':
+                var F = new feed.Feed({});
+                F.CreateFeed(req.user, req.body.body, respond);
+                break;
+
+            default:
+                log('warning', 'invalid request');
+                respond(false, 'Request not found');
+        }
+    else respond(false, 'Request not found');
+//    } catch (e) {
+//        sendException(e, function() {
+//            respond(false, 'Request format is wrong');
+//        });
+//    }
+};
+
+
 var winterfell = function(app) {
     app.post(/\/feed/, feedRequestRouter);
+
+    app.post(/\/userfeed/, userFeedRequestRouter);
 
 //    app.all("*", function(req, res) { res.send(404); });
 };

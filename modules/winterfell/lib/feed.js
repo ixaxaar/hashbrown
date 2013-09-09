@@ -103,6 +103,7 @@ var FeedSchema = new Schema({
     associations: { type: Array } // any associations for other modules
 });
 FeedSchema.index({ owner: 1, updated: -1 });
+FeedSchema.index({ acl: 1 });
 FeedSchema.index({ teams: 1 });
 
 // this is a virtual unix-style filesystem path for this feed
