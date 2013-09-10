@@ -5,6 +5,6 @@
  */
 
 module.exports = function(){
-//    var winterfell = require('./lib/winterfell');
-//    winterfell();
+    var timeline = require('./lib/timeline');
+    timeline.init();
 };

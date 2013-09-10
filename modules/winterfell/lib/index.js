@@ -1,5 +1,6 @@
 
 var feed = require('./feed');
+var timeline = require('./timeline');
 
 var framework = require('../../../framework')
     , notifyDevelopers = framework.notifyDevelopers
@@ -149,9 +150,38 @@ var userFeedRequestRouter = function(req, res, next) {
     if (validate(req.body, requestValidatorSchema))
         switch(req.body.request) {
 
-            case 'getfeeds':
-                var F = new feed.Feed({});
-                F.CreateFeed(req.user, req.body.body, respond);
+            // json -> body.slab: Integer
+            case 'usertimeline':
+                timeline.userTimelineBuilder(req.user, req.body.body.slab, respond);
+                break;
+
+            case 'teamtimeline':
+                // todo: can this query finding be eliminated?
+                framework.findTeam(req.body.body.team, req.user.org,
+                    function(err, t) {
+                        // user should be part of team asked for...
+                        if (!err && _.contains(req.user.teams, t.name))
+                            timeline.teamTimelineBuilder(t, req.body.body.slab, respond);
+                        else respond(false, 'Could not find team');
+                    });
+                break;
+
+            case 'broadcasttimeline':
+                timeline.broadcastTimelineBuilder(req.user, respond);
+                break;
+
+            case 'tagtimeline':
+                timeline.tagTimelineBuilder(req.user, req.body.body.tags,
+                    req.body.body.slab, respond);
+                break;
+
+            case 'listdocs':
+                timeline.docLister(req.user, respond);
+                break;
+
+            case 'docsearch':
+                timeline.docSearcher(req.user, req.body.body.query,
+                    req.body.body.slab, respond);
                 break;
 
             default:
@@ -170,7 +200,7 @@ var userFeedRequestRouter = function(req, res, next) {
 var winterfell = function(app) {
     app.post(/\/feed/, feedRequestRouter);
 
-    app.post(/\/userfeed/, userFeedRequestRouter);
+    app.post(/\/timeline/, userFeedRequestRouter);
 
 //    app.all("*", function(req, res) { res.send(404); });
 };
