@@ -4,9 +4,9 @@ var _ = require('underscore');
 
 var framework = require('../../../framework');
 
-var feed = require('./feed')
-    , Feed = feed.Feed
-    , getPath = feed.getPath;
+var __feed = require('./feed')
+    , Feed = __feed.Feed
+    , getPath = __feed.getPath;
 
 // redis server connection and stuff
 // yes, all this info is cached in _our_ redis server, so that
@@ -49,6 +49,11 @@ var keyBuilder = function(entity, type) {
     return entity.org + ":" + type + ":" + (entity.name || entity.uid);
 };
 
+// in case we have only the entity name, and not the object...
+var keyBuilder2 = function(asker, entity, type) {
+    return asker.org + ":" + type + ":" + entity;
+};
+
 // this is the unit of each stack
 var feedStackElement = function(feed) {
     this.uuid           = feed.uuid;
@@ -69,8 +74,15 @@ var userFeedStack = function(user) {
     this.ttl            = 24*60*60; // 24 hours
     this.stack          = [];
 };
-userFeedStack.prototype.hook = userFeedStackHook;
-userFeedStackHook = function() {};
+exports.userFeedStackHook = function(user, feed) {
+    client.get(keyBuilder(feed, 'p'), function(err, data) {
+        if (!err && data) {
+            data.stack.push(new feedStackElement(feed));
+            client.set(keyBuilder(feed), data, function(err) { });
+        }
+        else log('warning', 'user feed stack not found in cache');
+    })
+};
 
 // for team posts, each team has one - very frequent access
 var teamFeedStack = function(team) {
@@ -80,8 +92,17 @@ var teamFeedStack = function(team) {
     this.ttl            = 2*60*60; // 2 hours
     this.stack          = [];
 };
-teamFeedStack.prototype.hook = teamFeedStackHook;
-teamFeedStackHook = function() {};
+exports.teamFeedStackHook = function(user, feed) {
+    feed.teams.forEach(function(t) {
+        client.get(keyBuilder2(user, t, 't'), function(err, data) {
+            if (!err && data) {
+                data.stack.push(new feedStackElement(feed));
+                client.set(keyBuilder2(user, t, 't'), data, function(err) { });
+            }
+            else log('warning', 'team feed stack not found in cache');
+        })
+    });
+};
 
 // organization-level broadcasts
 var broadcastFeedStack = function(org) {
@@ -91,39 +112,60 @@ var broadcastFeedStack = function(org) {
     this.ttl            = 24*60*60; // 24 hours
     this.stack          = [];
 };
-broadcastFeedStack.prototype.hook = broadcastFeedStackHook;
-broadcastFeedStackHook = function() {};
+exports.broadcastFeedStackHook = function(user, feed) {
+    feed.teams.forEach(function(t) {
+        client.get(keyBuilder2(user, t, 't'), function(err, data) {
+            if (!err && data) {
+                data.stack.push(new feedStackElement(feed));
+                client.set(keyBuilder2(user, t, 't'), data, function(err) { });
+            }
+            else log('warning', 'broadcast feed stack not found in cache');
+        })
+    });
+};
+
 
 var userTimelineBuilder = function(user, slab, fn) {
-    // construct the query
-    var query = Feed.find({});
-    query.where('acl', user.uid);
-    query.and([{ org: user.org }]);
-    query.skip(slab * RECENT_FEEDLIST_SIZE);
-    query.limit(RECENT_FEEDLIST_SIZE);
-    query.sort('updated', -1);
+    var cont = false;
 
-    // execute the query
-    query.exec(function(err, docs) {
-        if (!err && docs.length) {
-            var ufs = new userFeedStack(user);
-            docs.forEach(function(d) {
-                ufs.stack.push(JSON.stringify(new feedStackElement(d)));
-            });
-            // well, feed it back to the caller first, then commit it into cache
-            fn && fn(true, ufs);
-
-            // cache only the first slab, not the whole thing
-            if (!slab)
-                client.setex(keyBuilder(user, 'p'), ufs, ufs.ttl, function(err) {
-                    if (err) log('warning', 'could not set user tieline into cache');
-                });
-        }
-        else {
-            log('warning', 'Could not find any records');
-            fn && fn(false, err);
-        }
+    // see if the cache already contains our data
+    if (!slab) client.get(keyBuilder(user, 'p'), function(err, data) {
+        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2)
+            fn && fn(true, data);
+        else cont = true;
     });
+
+    if (cont) {
+        // construct the query
+        var query = Feed.find({});
+        query.where('acl', user.uid);
+        query.and([{ org: user.org }]);
+        query.skip(slab * RECENT_FEEDLIST_SIZE);
+        query.limit(RECENT_FEEDLIST_SIZE);
+        query.sort('updated', -1);
+
+        // execute the query
+        query.exec(function(err, docs) {
+            if (!err && docs.length) {
+                var ufs = new userFeedStack(user);
+                docs.forEach(function(d) {
+                    ufs.stack.push(JSON.stringify(new feedStackElement(d)));
+                });
+                // well, feed it back to the caller first, then commit it into cache
+                fn && fn(true, ufs);
+
+                // cache only the first slab, not the whole thing
+                if (!slab)
+                    client.setex(keyBuilder(user, 'p'), ufs, ufs.ttl, function(err) {
+                        if (err) log('warning', 'could not set user tieline into cache');
+                    });
+            }
+            else {
+                log('warning', 'Could not find any records');
+                fn && fn(false, err);
+            }
+        });
+    }
 };
 
 // search for feeds tagged with a set of tags
@@ -235,60 +277,84 @@ var docSearcher = function(user, doc, slab, fn) {
 };
 
 
-var teamTimelineBuilder = function(team, fn) {
-    // construct the query
-    var query = Feed.find({});
-    query.where('teams', team.name);
-    query.and([{ org: team.org }]);
-    query.sort('updated', -1);
-    query.limit(RECENT_FEEDLIST_SIZE);
+var teamTimelineBuilder = function(team, slab, fn) {
+    var cont = false;
 
-    // execute the query
-    query.exec(function(err, docs) {
-        if (!err && docs.length) {
-            var tfs = new teamFeedStack(team);
-            docs.forEach(function(d) {
-                tfs.stack.push(JSON.stringify(new feedStackElement(d)));
-            });
-            // well, feed it back to the caller first, then commit it into cache
-            fn && fn(true, tfs);
-            client.setex(keyBuilder(team, 'p'), tfs, tfs.ttl, function(err) {
-                if (err) log('warning', 'could not set user tieline into cache');
-            });
-        }
-        else {
-            log('warning', 'Could not find any records');
-            fn && fn(false, err);
-        }
+    // see if the cache already contains our data
+    if (!slab) client.get(keyBuilder(team, 't'), function(err, data) {
+        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2)
+            fn && fn(true, data);
+        else cont = true;
     });
+
+    if (cont) {
+        // construct the query
+        var query = Feed.find({});
+        query.where('teams', team.name);
+        query.and([{ org: team.org }]);
+        query.sort('updated', -1);
+        query.skip(slab * RECENT_FEEDLIST_SIZE);
+        query.limit(RECENT_FEEDLIST_SIZE);
+
+        // execute the query
+        query.exec(function(err, docs) {
+            if (!err && docs.length) {
+                var tfs = new teamFeedStack(team);
+                docs.forEach(function(d) {
+                    tfs.stack.push(JSON.stringify(new feedStackElement(d)));
+                });
+                // well, feed it back to the caller first, then commit it into cache
+                fn && fn(true, tfs);
+                client.setex(keyBuilder(team, 'p'), tfs, tfs.ttl, function(err) {
+                    if (err) log('warning', 'could not set user tieline into cache');
+                });
+            }
+            else {
+                log('warning', 'Could not find any records');
+                fn && fn(false, err);
+            }
+        });
+    }
 };
 
 var broadcastTimelineBuilder = function(org, fn) {
-    // construct the query
-    var query = Feed.find({});
-    query.where('owner', org.uid);
-    query.and([{ org: org.org }]);
-    query.sort('updated', -1);
-    query.limit(RECENT_FEEDLIST_SIZE);
+    var cont = false;
 
-    // execute the query
-    query.exec(function(err, docs) {
-        if (!err && docs.length) {
-            var bfs = new broadcastFeedStack(team);
-            docs.forEach(function(d) {
-                bfs.stack.push(JSON.stringify(new feedStackElement(d)));
-            });
-            // well, feed it back to the caller first, then commit it into cache
-            fn && fn(true, bfs);
-            client.setex(keyBuilder(org, 'p'), bfs, bfs.ttl, function(err) {
-                if (err) log('warning', 'could not set user tieline into cache');
-            });
-        }
-        else {
-            log('warning', 'Could not find any records');
-            fn && fn(false, err);
-        }
+    // see if the cache already contains our data
+    if (!slab) client.get(keyBuilder(team, 't'), function(err, data) {
+        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2)
+            fn && fn(true, data);
+        else cont = true;
     });
+
+    if (cont) {
+        // construct the query
+        var query = Feed.find({});
+        query.where('owner', org.uid);
+        query.and([{ org: org.org }]);
+        query.sort('updated', -1);
+        query.skip(slab * RECENT_FEEDLIST_SIZE);
+        query.limit(RECENT_FEEDLIST_SIZE);
+
+        // execute the query
+        query.exec(function(err, docs) {
+            if (!err && docs.length) {
+                var bfs = new broadcastFeedStack(team);
+                docs.forEach(function(d) {
+                    bfs.stack.push(JSON.stringify(new feedStackElement(d)));
+                });
+                // well, feed it back to the caller first, then commit it into cache
+                fn && fn(true, bfs);
+                client.setex(keyBuilder(org, 'p'), bfs, bfs.ttl, function(err) {
+                    if (err) log('warning', 'could not set user tieline into cache');
+                });
+            }
+            else {
+                log('warning', 'Could not find any records');
+                fn && fn(false, err);
+            }
+        });
+    }
 };
 
 var UserFeedConstructor = function() {
@@ -324,5 +390,5 @@ var UserFeedConstructor = function() {
     });
 };
 
-module.exports = exports = UserFeedConstructor;
+exports.init = UserFeedConstructor;
 

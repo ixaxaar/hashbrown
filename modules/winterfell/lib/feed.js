@@ -11,6 +11,11 @@ var history = require('./history');
 var framework = require('../../../framework'),
     permissions = framework.permissions;
 
+var userfeed = require('userfeed')
+    , teamFeedStackHook = userfeed.teamFeedStackHook
+    , userFeedStackHook = userfeed.userFeedStackHook
+    , broadcastFeedStackHook = userfeed.broadcastFeedStackHook;
+
 var validation = require('./validation')
     , validate = validation.validate
     , createFeedSchema = validation.createFeedSchema
@@ -100,7 +105,8 @@ var FeedSchema = new Schema({
     acl: [String], // @mentions of people
     children: [ChildFeedSchema], // stack of child feeds
     versioned: { type: Boolean, default: false }, // is this versioned?
-    associations: { type: Array } // any associations for other modules
+    associations: { type: Array }, // any associations for other modules
+    broadcast: { type: Boolean, default: false } // is this a roadcast?
 });
 FeedSchema.index({ owner: 1, updated: -1 });
 FeedSchema.index({ acl: 1 });
@@ -132,6 +138,7 @@ history(FeedSchema);
      "private": "",        // boolean - private or public post
      "tags": [],           // optional - tags for faster searching
      "versioned": ""       // optional, boolean
+     "broadcast": ""       // whether this feed is a broadcast
      "associations": ""    // associations, request from different module
  }
  Output:
@@ -161,7 +168,9 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
         if (json.private) {
             this.private = true;
             this.teams = [];
-        } else if (json.belongs) {
+        }
+        else if (json.broadcast) this.broadcast = json.broadcast;
+        else if (json.belongs) {
             json.belongs.forEach(function(t) {
                 // policy: only add teams that the user himself belongs to
                 if(_.indexOf(user.teams, t) != -1) that.teams.push(t);
@@ -193,7 +202,14 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
 
         // commit to DB
         this.save(function(err, t) {
-            if (!err && t) fn(true, t);
+            if (!err && t) {
+                fn(true, t);
+
+                // fire hooks based on type of feed
+                if (t.private) userFeedStackHook(user, t);
+                else if (t.broadcast) broadcastFeedStackHook(user, t);
+                else teamFeedStackHook(user, t);
+            }
             else fn(false, 'Could not save ' + err.message);
         });
     }
@@ -416,7 +432,7 @@ var findFeed = function(asker, uuid, fn) {
 //            }
 //        });
 //
-//    // fall-back to thew brute-force way
+//    // fall-back to the brute-force way
 //    if (!found) Feed.find({})
 //        .where('uuid').equals(uuid)
 //        .exec(function(err, f) {

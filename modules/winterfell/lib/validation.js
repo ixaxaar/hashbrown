@@ -40,7 +40,8 @@ var createFeedSchema = {
             "type": "array",
             "items": { "type": "string"}
         },
-        "historyId": { "type": "string" }
+        "historyId": { "type": "string" },
+        "broadcast": { "type": "boolean" }
     }
 };
 v.addSchema(createFeedSchema, '/createFeedSchema');
