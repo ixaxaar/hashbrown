@@ -113,6 +113,10 @@ FeedSchema.virtual("path")
         return "/" + this.org + "/" + this.owner + "/" + this.content[0].displayname;
     });
 
+exports.getPath = function(doc) {
+    return "/" + doc.org + "/" + doc.owner + "/" + doc.content[0].displayname;
+};
+
 // add history support for these feeds
 history(FeedSchema);
 

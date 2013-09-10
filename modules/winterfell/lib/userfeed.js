@@ -6,7 +6,7 @@ var framework = require('../../../framework');
 
 var feed = require('./feed')
     , Feed = feed.Feed
-    , findFeed = feed.findFeed;
+    , getPath = feed.getPath;
 
 // redis server connection and stuff
 // yes, all this info is cached in _our_ redis server, so that
@@ -131,7 +131,8 @@ var tagTimelineBuilder = function(user, tags, slab, fn) {
     // construct the query
     var query = Feed.find({});
     tags && tags.forEach(function(tag) { query.where('tag', tag) });
-    query.and([{ org: user.org }]);
+    query.where('org', user.org);
+    query.or([ { teams: user.teams }, { acl: user.uid } ]);
     query.skip(slab * RECENT_FEEDLIST_SIZE);
     query.limit(RECENT_FEEDLIST_SIZE);
     query.sort('updated', -1);
@@ -149,20 +150,64 @@ var tagTimelineBuilder = function(user, tags, slab, fn) {
     });
 };
 
-//var docLister = function(user, fn) {
-//    var ufs = new userFeedStack(user);
-//
-//    user.teams.forEach(function(t) {
-//        //
-//    });
-//
-//    var query = Feed.find({});
-//    query.where('content.displayName', rx);
-//    query.and([{ org: user.org }]);
-//    query.skip(slab * RECENT_FEEDLIST_SIZE);
-//    query.limit(RECENT_FEEDLIST_SIZE);
-//    query.sort('updated', -1);
-//};
+var docLister = function(user, fn) {
+    // this is gonna be a huge fucking function :/
+    /*
+        to show:
+        1. Latest versions of all versioned documents
+        2. All personal documents owned by this user
+        how to:
+        1. Iterate through all versioned documents of this user's teams
+            repitions are not allowed
+        2. Iterate through all documents which have this user in their acl
+            (repitions are allowed here)
+        policy: private documents - can they be versioned?
+    */
+    var versionedDocs
+        , privateDocs;
+
+    var query = Feed.find({});
+    query.where('versioned').equals("true");
+    query.where('org', user.org);
+    query.or([ { teams: user.teams }, { acl: user.uid } ]);
+    query.sort('updated', -1);
+
+    query.exec(function(err, docs) {
+        var stack = [];
+        docs.forEach(function(doc) {
+            stack.push({
+                uuid:               doc.uuid,
+                owner:              doc.owner,
+                displayName:        doc.content[0].displayName,
+                tags:               doc.tags,
+                teams:              doc.teams
+            });
+        });
+        versionedDocs = stack;
+    });
+
+    query = Feed.find({});
+    query.where('org', user.org);
+    query.where(acl, user.uid);
+    query.sort('updated', -1);
+
+    query.exec(function(err, docs) {
+        var stack = [];
+        docs.forEach(function(doc) {
+            stack.push({
+                uuid:               doc.uuid,
+                owner:              doc.owner,
+                displayName:        doc.content[0].displayName,
+                tags:               doc.tags,
+                teams:              doc.teams
+            });
+        });
+        privateDocs = stack;
+    });
+
+    fn && fn(true, versionedDocs + privateDocs);
+};
+
 
 // search for a document
 var docSearcher = function(user, doc, slab, fn) {
@@ -170,7 +215,8 @@ var docSearcher = function(user, doc, slab, fn) {
     var rx = new RegExp('/.*' + doc + '.*/'); // todo: choose a utf8-safe regexp?
     var query = Feed.find({});
     query.where('content.displayName', rx);
-    query.and([{ org: user.org }]);
+    query.where('org', user.org);
+    query.or([ { teams: user.teams }, { acl: user.uid } ]);
     query.skip(slab * RECENT_FEEDLIST_SIZE);
     query.limit(RECENT_FEEDLIST_SIZE);
     query.sort('updated', -1);
