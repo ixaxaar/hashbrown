@@ -11,7 +11,7 @@ var history = require('./history');
 var framework = require('../../../framework'),
     permissions = framework.permissions;
 
-var userfeed = require('userfeed')
+var userfeed = require('./timeline')
     , teamFeedStackHook = userfeed.teamFeedStackHook
     , userFeedStackHook = userfeed.userFeedStackHook
     , broadcastFeedStackHook = userfeed.broadcastFeedStackHook;

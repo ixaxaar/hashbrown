@@ -640,6 +640,29 @@ var godCreatesAnOrg = function(user, json, fn) {
 };
 exports.godCreatesAnOrg = godCreatesAnOrg;
 
+exports.forEachOrg = function(fn) {
+    Organization.find({}, function(err, orgs) {
+        if (!err && orgs.length) {
+            orgs.forEach(fn);
+        }
+    });
+};
+
+exports.forEachTeam = function(fn) {
+    Organization.find({}, function(err, orgs) {
+        if (!err && orgs.length) {
+            orgs.forEach(function(o) {
+                var conn = connMgr.getConnection(o.connectionString);
+                var Team = conn.model("TeamSchema", TeamSchema);
+
+                if (conn) Team.find({}, function(err, teams) {
+                    teams.forEach(fn);
+                });
+            });
+        }
+    });
+};
+
 
 var teamConstructor = function() {
     // connect everything we know of

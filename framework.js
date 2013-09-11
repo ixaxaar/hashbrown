@@ -20,6 +20,7 @@ exports.fournotfour = require('./framework/fournotfour');
 
 // entity's exports
 exports.findUserbyuid = entity.findByUsername;
+exports.forEachUser = entity.forEachUser;
 
 // validation's exports
 exports.validator = validation.validator;
@@ -61,4 +62,5 @@ exports.getAPI = realm.getAPI;
 exports.findOrganization = team.findOrganization;
 exports.findTeam = team.findTeam;
 exports.getConnection = team.GetConnection;
-
+exports.forEachOrg = team.forEachOrg;
+exports.forEachTeam = team.forEachTeam;

@@ -314,6 +314,14 @@ UserSchema.methods.removeUserFromTeam = function(granter, teamName, fn) {
 var User = mongoose.model("UserSchema", UserSchema);
 User.ensureIndexes(function(err){ if (err) console.log('ensureIndexes failed')});
 
+var forEachUser = function(fn) {
+    User.find({}, function(err, users) {
+        if (!err && users.length) users.forEach(fn);
+    });
+};
+exports.forEachUser = forEachUser;
+
+
 ////////////////////////////////
 //   Kingdoms
 ////////////////////////////////
