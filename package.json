@@ -20,7 +20,6 @@
     "jade": "*",
     "marked": "*",
     "jsonschema": "*",
-    "tobi" : "*",
     "winston": "*",
     "winston-syslog": "*"
   },
