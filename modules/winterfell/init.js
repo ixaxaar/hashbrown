@@ -4,7 +4,11 @@
  * Time: 9:56 PM
  */
 
+
+var winston = require('winston');
+global.log = winston.log;
+
 module.exports = function(){
-//    var winterfell = require('./lib/winterfell');
-//    winterfell();
+    var timeline = require('./lib/timeline');
+    timeline.init();
 };

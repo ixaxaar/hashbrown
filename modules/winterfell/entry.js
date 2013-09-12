@@ -4,25 +4,31 @@
  * Time: 9:22 PM
  */
 
-var mordor = require('../../routes/ODNSWIM');
+var framework = require('../../framework');
 
-var validateAccess = function(req, res, next) {
+var express = require('express');
+var app = express();
 
-};
 
+var winston = require('winston');
+global.log = winston.log;
 
-//Configure this module's routes:
+//Configure this module's framework:
 //each app.get can define handlers for GET requests handled
 //by each sub-module
 module.exports = function () {
-    var express = require('express');
-    var app = express();
+    // the POST routes
+    app.post(/.*/, framework.checkCredentials);
 
-    app.get(/.*/, function (req, res) {
-        res.send(req.path);
-    });
+    var winterfell = require('./lib/');
+    winterfell(app);
 
-    app.post(/.*/, require("./lib/feed"));
+//    any intermediate GET routes go here
+
+//    for everything else
+    app.all("*", function(req, res) { return res.send(404); });
+
+    log('info', 'winterfell is up!');
 
     return app;
 }();

@@ -15,8 +15,17 @@ var mongoose = require('mongoose')
     , Schema = mongoose.Schema
     , ObjectId = Schema.ObjectId;
 
+// json schema validation - for request jsons
+var Validator = require('jsonschema').Validator;
+var v = new Validator();
+
 // Internal Dependencies
 var entity = require('./entity');
+
+// json schema validation - for request jsons
+var validation = require('./validation')
+    , v = validation.validator
+    , userValidationSchema = validation.userValidationSchema;
 
 
 /** How ODNSWIM works:
@@ -45,10 +54,17 @@ var _calcMaxPermission = function(entity, kingdom, fn) {
 };
 
 var _hasGreaterPermission = function(granter, user, fn) {
-    if ((granter.perm[0].admin > user.perm[0].admin) ||
-    ((granter.perm[0].admin & user.perm[0].admin) == Permission.god)) {
-        fn(null);
-    } else fn('Granter has lesser permission than user');
+    if (granter.org === user.org) {
+        if ((granter.perm[0].admin > user.perm[0].admin) ||
+            ((granter.perm[0].admin & user.perm[0].admin) == Permission.god)) {
+            fn(null);
+        } else fn('Granter has lesser permission than user');
+    }
+    else if (granter.uid === 'god') fn(null);
+    else {
+        log('warning', 'someone tried to access other organizations user');
+        fn('you stop right there buddy');
+    }
 };
 
 var Permission = {
@@ -76,12 +92,15 @@ function _generateKeyToMordor(hash) {
     return salt + crypto.createHash("md5").update(hash).digest("hex");
 }
 
+////////////////////////////////////
+//      Schemas
+////////////////////////////////////
+
 /**
  * User's password hash structure
  */
 
 var PasswordSchema = Schema({
-    user:       String,
     hash:       String
 });
 
@@ -98,11 +117,14 @@ exports.Password = PasswordS;
  */
 
 UserPermissionSchema = Schema({
-    uuid:       String,
     perm:       [Number],
     admin:      Number,
     password:   [PasswordSchema]
 });
+
+////////////////////////////////////
+//      Methods
+////////////////////////////////////
 
 // function having the sole authority to grant user's permissions
 UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) {
@@ -133,6 +155,15 @@ UserPermissionSchema.methods.grant = function(granter, user, kingdom, perm, fn) 
                 fn("Does not have authority over module to grant permission.", null);
             }
         } else fn("Does not have authority over user to grant permission.", null);
+    });
+};
+
+UserPermissionSchema.methods.getPermission = function(granter, user, kingdom, fn) {
+    Permission.hasGreaterPermission(granter, user, function(err) {
+        // this functionality is available to the granter as well as the user
+        if (!err || granter.uid === user.uid) {
+            return user.perm[0].perm[kingdom.perm[0].permEntry] = perm;
+        } else fn("Does not have authority see permission.", null);
     });
 };
 
@@ -204,31 +235,30 @@ exports.KingdomPermission = KingdomPermission;
 /**
  * Construct the gates of MORDOR!
  */
-exports.BlackGate = BlackGate;
-
-function BlackGate(app, express, passport) {
-    app.use(express.cookieParser('eylhjfgewhbfiwegqwgiqwhkbhkvgu'));
+var BlackGate = function(app, express, passport) {
+    app.use(express.cookieParser('ahdbahsdavdjhbfhk'));
+    var RedisStore = require('connect-redis')(express);
     app.use(express.session({
-//        maxAge:new Date(Date.now() + 3600000),
-//        store: sessionStore
+        secret: "kqsdjfmlksdhfhzirzeoibrzecrbzuzefcuercazeafxzeokwdfzeijfxcerig",
+        store: new RedisStore({ host: 'localhost' })
     }));
-//    require('connect-redis')(express);
     app.use(passport.initialize());
     app.use(passport.session());
-}
+};
+exports.BlackGate = BlackGate;
 
-sessionStore = {
-    get:    function(sid, callback) {
 
-    },
+var serializer = function(user, done) {
+    log('debug', user.uid + ' serialized');
+    done(null, user.uid);
+};
 
-    set:    function(sid, session, callback) {
-
-    },
-
-    destroy:    function(sid, callback) {
-
-    }
+var deserializer = function(id, done) {
+    entity.findByUsername(id, function(err, u) {
+        if (u) log('debug', u.uid + ' deserialized');
+        if (err) log('crit', err);
+        done(err, u);
+    });
 };
 
 exports.createTheBlackGates = function(passport) {
@@ -237,30 +267,21 @@ exports.createTheBlackGates = function(passport) {
     //   serialize users into and deserialize users out of the session.  Typically,
     //   this will be as simple as storing the user ID when serializing, and finding
     //   the user by ID when deserializing.
-    passport.serializeUser(function(user, done) {
-//        entity.add(user, function(u){
-            done(null, user.uid);
-//        });
-    });
+    passport.serializeUser(serializer);
 
-    passport.deserializeUser(function(id, done) {
-        entity.findByUsername(id, function(err, u) {
-            done(err, u);
-        });
-    });
+    passport.deserializeUser(deserializer);
 
     // Use the LocalStrategy within Passport.
     //   Strategies in passport require a `verify` function, which accept
     //   credentials (in this case, a username and password), and invoke a callback
-    //   with a user object.  In the real world, this would query a database;
-    //   however, in this example we are using a baked-in set of users.
+    //   with a user object.
     passport.use(new LocalStrategy(
         function(username, password, done) {
             // asynchronous verification, for effect...
             process.nextTick(function () {
                 // Find the user by username.  If there is no user with the given
                 // username, or the password is not correct, set the user to `false` to
-                // indicate failure and set a flash message.  Otherwise, return the
+                // indicate failure.  Otherwise, return the
                 // authenticated `user`.
                 entity.findByUsername(username, function(err, user) {
                     // failure cases
@@ -274,7 +295,7 @@ exports.createTheBlackGates = function(passport) {
                         return done(null, false, {message: 'Invalid password'});
                     }
                     else {
-                        console.log('User auth passed');
+                        log('info', user.uid + ' user auth passed');
                         return done(null, user);
                     }
                 });

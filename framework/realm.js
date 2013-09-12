@@ -150,7 +150,7 @@ exports.enterKingdom = function(app, kingdomName){
         realm.kingdoms.forEach(function(kingdom) {
             if (kingdom.name == kingdomName) {
                 var k = new entity.Kingdom({});
-                k.Add(kingdom, KingdomCtr, function(err, kd) {
+                k.addUser(kingdom, KingdomCtr, function(err, kd) {
                     if (!err) {
                         // add the routing middleware
                         app.use('/' + kingdom.name,

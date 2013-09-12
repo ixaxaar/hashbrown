@@ -11,12 +11,12 @@ var app;
 // todo: auto-remove this
 var kingdom;
 
-var backend = require(process.cwd() + '/routes/realm');
-var realm = require(process.cwd() + '/routes/realm');
-var mordor = require(process.cwd() + '/routes/ODNSWIM');
-var entity = require(process.cwd() + '/routes/entity');
+var backend = require(process.cwd() + '/framework/realm');
+var realm = require(process.cwd() + '/framework/realm');
+var mordor = require(process.cwd() + '/framework/ODNSWIM');
+var entity = require(process.cwd() + '/framework/entity');
 
-//Configure this module's routes:
+//Configure this module's framework:
 //each app.get can define handlers for GET requests handled
 //by each sub-module
 module.exports = function () {
