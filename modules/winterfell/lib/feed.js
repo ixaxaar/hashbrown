@@ -7,14 +7,12 @@ var mongoose = require('mongoose')
 var uuid = require('node-uuid');
 var _ = require('underscore');
 
+var winston = require('winston');
+global.log = winston.log;
+
 var history = require('./history');
 var framework = require('../../../framework'),
     permissions = framework.permissions;
-
-var userfeed = require('./timeline')
-    , teamFeedStackHook = userfeed.teamFeedStackHook
-    , userFeedStackHook = userfeed.userFeedStackHook
-    , broadcastFeedStackHook = userfeed.broadcastFeedStackHook;
 
 var validation = require('./validation')
     , validate = validation.validate
@@ -196,22 +194,21 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
         if (json.versioned) //history.enableHistory(this, this.path);
         {
             this.versioned = true;
-            this.versionuid = json.historyId || this.path;
+            this.versionuid = json.historyId        || this.path;
         }
         this.associations = json.associations       || {};
 
         // commit to DB
         this.save(function(err, t) {
-            if (!err && t) {
-                fn(true, t);
-
-                // fire hooks based on type of feed
-                if (t.private) userFeedStackHook(user, t);
-                else if (t.broadcast) broadcastFeedStackHook(user, t);
-                else teamFeedStackHook(user, t);
-            }
+            if (!err && t) fn(true, t);
             else fn(false, 'Could not save ' + err.message);
         });
+
+        // fire hooks based on type of feed
+        var timeline = require('./timeline');
+        if (this.private) timeline.userFeedStackHook(user, this);
+        else if (this.broadcast) timeline.broadcastFeedStackHook(user, this);
+        else timeline.teamFeedStackHook(user, this);
     }
     else fn(false, 'Request format is wrong');
 };

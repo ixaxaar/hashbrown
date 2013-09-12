@@ -1,10 +1,15 @@
 
-var feed = require('./feed');
+
 var timeline = require('./timeline');
+var feed = require('./feed');
+
+var winston = require('winston');
+global.log = winston.log;
 
 var framework = require('../../../framework')
     , notifyDevelopers = framework.notifyDevelopers
-    , report = framework.heartbeatEnabled;
+    , report = framework.heartbeatEnabled
+    , findTeam = framework.findTeam;
 
 var validation = require('./validation')
     , validate = validation.validate
@@ -157,7 +162,7 @@ var userFeedRequestRouter = function(req, res, next) {
 
             case 'teamtimeline':
                 // todo: can this query finding be eliminated?
-                framework.findTeam(req.body.body.team, req.user.org,
+                findTeam(req.body.body.team, req.user.org,
                     function(err, t) {
                         // user should be part of team asked for...
                         if (!err && _.contains(req.user.teams, t.name))
@@ -167,7 +172,7 @@ var userFeedRequestRouter = function(req, res, next) {
                 break;
 
             case 'broadcasttimeline':
-                timeline.broadcastTimelineBuilder(req.user, respond);
+                timeline.broadcastTimelineBuilder(req.user, req.body.body.slab, respond);
                 break;
 
             case 'tagtimeline':

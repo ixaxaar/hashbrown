@@ -317,6 +317,55 @@ http://localhost:3000/winterfell/feed
 }
 ```
 
+12. Retreive user's private timeline:
+http://localhost:3000/winterfell/timeline
+```JSON
+{
+    "request":"usertimeline",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+    }
+}
+```
+
+13. Retreive team timeline:
+http://localhost:3000/winterfell/timeline
+```JSON
+{
+    "request":"teamtimeline",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "team": "god"
+    }
+}
+```
+
+14.  Retreive broadcast timeline:
+http://localhost:3000/winterfell/timeline
+```JSON
+{
+    "request":"broadcasttimeline",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+    }
+}
+```
+
+14.  Retreive tag timeline:
+http://localhost:3000/winterfell/timeline
+```JSON
+{
+    "request":"tagtimeline",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "tags": ["first", "second"],
+        "slab": "3"
+    }
+}
+```
+
+
+
 
 Response schema validator:
 =========

@@ -5,8 +5,10 @@ var _ = require('underscore');
 var framework = require('../../../framework');
 
 var __feed = require('./feed')
-    , Feed = __feed.Feed
-    , getPath = __feed.getPath;
+    , Feed = __feed.Feed;
+
+var winston = require('winston');
+var log = winston.log;
 
 // redis server connection and stuff
 // yes, all this info is cached in _our_ redis server, so that
@@ -72,27 +74,35 @@ var feedStackElement = function(feed) {
 /////////////////////////////////////
 
 var userFeedStack = function(user) {
-    this.name           = user.uid;
-    this.org            = user.org;
-    this.key            = keyBuilder(user, 'p');
+    this.name           = user.uid      || '';
+    this.org            = user.org      || '';
+    this.key            = (!!user) && keyBuilder(user, 'p') || '';
     this.ttl            = 24*60*60; // 24 hours
     this.stack          = [];
 };
 exports.userFeedStackHook = function(user, feed) {
-    client.get(keyBuilder(feed, 'p'), function(err, data) {
+    client.get(keyBuilder(user, 'p'), function(err, data) {
         if (!err && data) {
+            data = JSON.parse(data);
             data.stack.push(new feedStackElement(feed));
-            client.set(keyBuilder(feed), data, function(err) { });
+            client.setex(data.key, data.ttl, JSON.stringify(data),
+                function(err) { log('error', err) });
         }
-        else log('warning', 'user feed stack not found in cache');
-    })
+        else {
+            var fse = new feedStackElement(feed);
+            var ufs = new userFeedStack(user);
+            ufs.stack.push(fse);
+            client.setex(ufs.key, ufs.ttl, JSON.stringify(ufs),
+                function(err) { log('error', err) });
+        }
+    });
 };
 
 // for team posts, each team has one - very frequent access
 var teamFeedStack = function(team) {
-    this.name           = team.name;
-    this.org            = team.org;
-    this.key            = keyBuilder(team, 't');
+    this.name           = team.name         || '';
+    this.org            = team.org          || '';
+    this.key            = (!!team) && keyBuilder(team, 't') || '';
     this.ttl            = 2*60*60; // 2 hours
     this.stack          = [];
 };
@@ -100,31 +110,48 @@ exports.teamFeedStackHook = function(user, feed) {
     feed.teams.forEach(function(t) {
         client.get(keyBuilder2(user, t, 't'), function(err, data) {
             if (!err && data) {
+                data = JSON.parse(data);
                 data.stack.push(new feedStackElement(feed));
-                client.set(keyBuilder2(user, t, 't'), data, function(err) { });
+                client.setex(data.key, data.ttl, JSON.stringify(data),
+                    function(err) { log('error', err) });
             }
-            else log('warning', 'team feed stack not found in cache');
-        })
+            else {
+                var fse = new feedStackElement(feed);
+                var tfs = new teamFeedStack();
+                tfs.name = t;
+                tfs.org = user.org;
+                tfs.key = keyBuilder2(user, t, 't');
+                tfs.stack.push(fse);
+                client.setex(tfs.key, tfs.ttl, JSON.stringify(tfs),
+                    function(err) { log('error', err) });
+            }
+        });
     });
 };
 
 // organization-level broadcasts
 var broadcastFeedStack = function(org) {
-    this.name           = org.name;
-    this.org            = org.org;
-    this.key            = keyBuilder(org, 'b');
+    this.name           = org.name          || '';
+    this.org            = org.org           || '';
+    this.key            = (!!org) && keyBuilder(org, 'b') || '';
     this.ttl            = 24*60*60; // 24 hours
     this.stack          = [];
 };
 exports.broadcastFeedStackHook = function(user, feed) {
-    feed.teams.forEach(function(t) {
-        client.get(keyBuilder2(user, t, 't'), function(err, data) {
-            if (!err && data) {
-                data.stack.push(new feedStackElement(feed));
-                client.set(keyBuilder2(user, t, 't'), data, function(err) { });
-            }
-            else log('warning', 'broadcast feed stack not found in cache');
-        })
+    client.get(keyBuilder(user, 'b'), function(err, data) {
+        if (!err && data) {
+            data = JSON.parse(data);
+            data.stack.push(new feedStackElement(feed));
+            client.setex(data.key, data.ttl, JSON.stringify(data),
+                function(err) { log('error', err) });
+        }
+        else {
+            var fse = new feedStackElement(feed);
+            var bfs = new broadcastFeedStack(user);
+            bfs.stack.push(fse);
+            client.setex(bfs.key, bfs.ttl, JSON.stringify(bfs),
+                function(err) { log('error', err) });
+        }
     });
 };
 
@@ -134,13 +161,14 @@ exports.broadcastFeedStackHook = function(user, feed) {
 /////////////////////////////////////
 
 var userTimelineBuilder = function(user, slab, fn) {
-    var cont = false;
+    var cont = true;
 
     // see if the cache already contains our data
     if (!slab) client.get(keyBuilder(user, 'p'), function(err, data) {
-        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2)
+        data = JSON.parse(data);
+        if (!err && data && data.stack && data.stack.length > RECENT_FEEDLIST_SIZE/2)
             fn && fn(true, data);
-        else cont = true;
+        else cont = false;
     });
 
     if (cont) {
@@ -150,7 +178,7 @@ var userTimelineBuilder = function(user, slab, fn) {
         query.and([{ org: user.org }]);
         query.skip(slab * RECENT_FEEDLIST_SIZE);
         query.limit(RECENT_FEEDLIST_SIZE);
-        query.sort('updated', -1);
+        query.sort({ updated: -1 });
 
         // execute the query
         query.exec(function(err, docs) {
@@ -164,9 +192,10 @@ var userTimelineBuilder = function(user, slab, fn) {
 
                 // cache only the first slab, not the whole thing
                 if (!slab)
-                    client.setex(keyBuilder(user, 'p'), ufs, ufs.ttl, function(err) {
-                        if (err) log('warning', 'could not set user tieline into cache');
+                    client.setex(keyBuilder(user, 'p'), ufs.ttl, JSON.stringify(ufs), function(err) {
+                        if (err) console.log(err);
                     });
+                else console.log('agdasg')
             }
             else {
                 log('warning', 'Could not find any records');
@@ -174,17 +203,18 @@ var userTimelineBuilder = function(user, slab, fn) {
             }
         });
     }
+    else fn(false, 'logic error');
 };
 exports.userTimelineBuilder = userTimelineBuilder;
 
 var teamTimelineBuilder = function(team, slab, fn) {
-    var cont = false;
+    var cont = true;
 
     // see if the cache already contains our data
     if (!slab) client.get(keyBuilder(team, 't'), function(err, data) {
         if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2)
             fn && fn(true, data);
-        else cont = true;
+        else cont = false;
     });
 
     if (cont) {
@@ -192,7 +222,7 @@ var teamTimelineBuilder = function(team, slab, fn) {
         var query = Feed.find({});
         query.where('teams', team.name);
         query.and([{ org: team.org }]);
-        query.sort('updated', -1);
+        query.sort({ updated: -1 });
         query.skip(slab * RECENT_FEEDLIST_SIZE);
         query.limit(RECENT_FEEDLIST_SIZE);
 
@@ -215,17 +245,18 @@ var teamTimelineBuilder = function(team, slab, fn) {
             }
         });
     }
+    else fn(false, 'logic error');
 };
 exports.teamTimelineBuilder = teamTimelineBuilder;
 
-var broadcastTimelineBuilder = function(user, fn) {
-    var cont = false;
+var broadcastTimelineBuilder = function(user, slab, fn) {
+    var cont = true;
 
     // see if the cache already contains our data
     if (!slab) client.get(keyBuilder2(user, user.org, 't'), function(err, data) {
         if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2)
             fn && fn(true, data);
-        else cont = true;
+        else cont = false;
     });
 
     if (cont) {
@@ -233,14 +264,14 @@ var broadcastTimelineBuilder = function(user, fn) {
         var query = Feed.find({});
         query.where('broadcast', true);
         query.and([{ org: user.org }]);
-        query.sort('updated', -1);
+        query.sort({ updated: -1 });
         query.skip(slab * RECENT_FEEDLIST_SIZE);
         query.limit(RECENT_FEEDLIST_SIZE);
 
         // execute the query
         query.exec(function(err, docs) {
             if (!err && docs.length) {
-                var bfs = new broadcastFeedStack(team);
+                var bfs = new broadcastFeedStack(user);
                 docs.forEach(function(d) {
                     bfs.stack.push(JSON.stringify(new feedStackElement(d)));
                 });
@@ -256,6 +287,7 @@ var broadcastTimelineBuilder = function(user, fn) {
             }
         });
     }
+    else fn(false, 'logic error');
 };
 exports.broadcastTimelineBuilder = broadcastTimelineBuilder;
 
@@ -263,15 +295,16 @@ exports.broadcastTimelineBuilder = broadcastTimelineBuilder;
 var tagTimelineBuilder = function(user, tags, slab, fn) {
     // construct the query
     var query = Feed.find({});
-    tags && tags.forEach(function(tag) { query.where('tag', tag) });
+    tags && tags.forEach(function(tag) { query.where("tags.name", tag) });
     query.where('org', user.org);
     query.or([ { teams: user.teams }, { acl: user.uid } ]);
+    query.sort({ updated: -1 });
     query.skip(slab * RECENT_FEEDLIST_SIZE);
     query.limit(RECENT_FEEDLIST_SIZE);
-    query.sort('updated', -1);
 
     // execute the query
     query.exec(function(err, docs) {
+        console.log(docs)
         if (!err && docs.length) {
             var ufs = new userFeedStack(user);
             docs.forEach(function(d) {
@@ -393,7 +426,7 @@ var UserFeedConstructor = function() {
     });
 
     // multiple-node problem - dont do anything to the values already in memory
-    // maybe they have been stored there by another server
+    // maybe they have been stored there by another server instance
     framework.forEachTeam(function(t) {
         var tfs = new teamFeedStack(t);
         client.get(tfs.key, function(err, data) {

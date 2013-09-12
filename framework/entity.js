@@ -9,6 +9,9 @@
 // External dependencies
 var uuid = require('node-uuid');
 
+var winston = require('winston');
+global.log = winston.log;
+
 // db
 var mongoose = require('mongoose')
     , Schema = mongoose.Schema

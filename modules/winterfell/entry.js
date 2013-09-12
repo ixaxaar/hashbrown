@@ -9,6 +9,10 @@ var framework = require('../../framework');
 var express = require('express');
 var app = express();
 
+
+var winston = require('winston');
+global.log = winston.log;
+
 //Configure this module's framework:
 //each app.get can define handlers for GET requests handled
 //by each sub-module
@@ -23,6 +27,8 @@ module.exports = function () {
 
 //    for everything else
     app.all("*", function(req, res) { return res.send(404); });
+
+    log('info', 'winterfell is up!');
 
     return app;
 }();

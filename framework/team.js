@@ -12,6 +12,9 @@ var path = require('path');
 var uuid = require('node-uuid');
 var _ = require('underscore');
 
+var winston = require('winston');
+global.log = winston.log;
+
 // json schema validation - for request jsons
 var validation = require('./validation')
     , v = validation.validator
@@ -376,7 +379,8 @@ var findOrganization = function(name, fn) {
 exports.findOrganization = findOrganization;
 exports.findTeam = function(name, org, fn) {
     exports.findOrganization(org, function(err, o) {
-        o.findTeam(name, fn);
+        if (!err && o) o.findTeam(name, fn)
+        else fn('Could not find team');
     })
 };
 
