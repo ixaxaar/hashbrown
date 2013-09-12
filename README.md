@@ -316,6 +316,8 @@ http://localhost:3000/winterfell/feed
 	}
 }
 ```
+Timeline fetchers. each of the below queries also support "slab": "Number" parameteres inside "body"
+Each slab fetches 20 entries of results. Slab numbering starts from 0.
 
 12. Retreive user's private timeline:
 http://localhost:3000/winterfell/timeline
@@ -351,7 +353,7 @@ http://localhost:3000/winterfell/timeline
 }
 ```
 
-14.  Retreive tag timeline:
+15.  Retreive tag timeline:
 http://localhost:3000/winterfell/timeline
 ```JSON
 {
@@ -364,8 +366,28 @@ http://localhost:3000/winterfell/timeline
 }
 ```
 
+16. List all documents:
+http://localhost:3000/winterfell/timeline
+```JSON
+{
+    "request":"listdocs",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+    }
+}
+```
 
-
+17. Search for a document (very basic search):
+http://localhost:3000/winterfell/timeline
+```JSON
+{
+    "request":"docsearch",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "query": "haha"
+    }
+}
+```
 
 Response schema validator:
 =========
@@ -398,3 +420,6 @@ Every feed has "uuid" field which can be used by frontend to verify the response
 
 More to test, especially feeds and feed history
 In case any other APIs are needed, create an issue on github - better way to track what we do.
+
+Also, most of these APIs are tested with user: god, pass:123
+more rigorous testing is on the way after the first barebone feature set is ready.

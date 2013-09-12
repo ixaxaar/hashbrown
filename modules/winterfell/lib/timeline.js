@@ -341,7 +341,7 @@ var docLister = function(user, fn) {
     query.where('versioned').equals("true");
     query.where('org', user.org);
     query.or([ { teams: user.teams }, { acl: user.uid } ]);
-    query.sort('updated', -1);
+    query.sort({ updated: -1 });
 
     query.exec(function(err, docs) {
         var stack = [];
@@ -354,29 +354,32 @@ var docLister = function(user, fn) {
                 teams:              doc.teams
             });
         });
-        versionedDocs = stack;
-    });
+        versionedDocs = JSON.stringify(stack);
+        query = Feed.find({});
+        query.where('org', user.org);
+        query.where('acl', user.uid);
+        query.sort({ updated: -1 });
 
-    query = Feed.find({});
-    query.where('org', user.org);
-    query.where(acl, user.uid);
-    query.sort('updated', -1);
-
-    query.exec(function(err, docs) {
-        var stack = [];
-        docs.forEach(function(doc) {
-            stack.push({
-                uuid:               doc.uuid,
-                owner:              doc.owner,
-                displayName:        doc.content[0].displayName,
-                tags:               doc.tags,
-                teams:              doc.teams
+        query.exec(function(err, docs) {
+            var stack = [];
+            docs.forEach(function(doc) {
+                stack.push({
+                    uuid:               doc.uuid,
+                    owner:              doc.owner,
+                    displayName:        doc.content[0].displayName,
+                    tags:               doc.tags,
+                    teams:              doc.teams
+                });
             });
+            privateDocs = JSON.stringify(stack);
+            fn && fn(true,
+                {
+                    versioned: versionedDocs,
+                    private: privateDocs
+                }
+            );
         });
-        privateDocs = stack;
     });
-
-    fn && fn(true, versionedDocs + privateDocs);
 };
 exports.docLister = docLister;
 
@@ -387,14 +390,14 @@ exports.docLister = docLister;
 // search for a document
 var docSearcher = function(user, doc, slab, fn) {
     // construct the query
-    var rx = new RegExp('/.*' + doc + '.*/'); // todo: choose a utf8-safe regexp?
+    var rx = new RegExp('.*' + doc + '.*'); // todo: choose a utf8-safe regexp?
     var query = Feed.find({});
-    query.where('content.displayName', rx);
+    query.where('content.displayname', rx);
     query.where('org', user.org);
     query.or([ { teams: user.teams }, { acl: user.uid } ]);
     query.skip(slab * RECENT_FEEDLIST_SIZE);
     query.limit(RECENT_FEEDLIST_SIZE);
-    query.sort('updated', -1);
+    query.sort({ updated: -1 });
 
     // execute the query
     query.exec(function(err, docs) {
