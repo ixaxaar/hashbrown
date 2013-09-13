@@ -173,7 +173,7 @@ var orgServer = function(req, res, next) {
                     break;
 
                 default:
-                    res.send(new result(req.body.uuid, req.body.request, 'Invalid request', false));
+                    respond(false, 'Request format is wrong');
                     break;
             }
         else respond(false, 'Request format is wrong');

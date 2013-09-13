@@ -136,7 +136,7 @@ UserSchema.methods.deleteUser = function(granter, fn) {
             // either granter is user's baap or the user himself!
             if (!err || granter.uid === that.uid) {
                 // find and remove from the DB
-                User.findOne({ uuid: that.uuid }).remove(function(err, u) {
+                that.remove(function(err, u) {
                     // todo: after a user is deleted, his parent owns everything
                     if (!err) fn(null, u);
                     else fn('Could not find and delete user', null);
@@ -378,7 +378,6 @@ findKingdomByUrl = function(name, fn) {
         });
 
     if (!ret) {
-        log('info', 'Could not find kingdom ' + name);
         fn('Could not find kingdom', null);
     }
 };

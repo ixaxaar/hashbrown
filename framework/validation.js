@@ -235,7 +235,8 @@ var godCreatesAnOrgSchema  = {
         "hash": { "type": "string", "required": true },
         "kingdoms": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": { "type": "string" },
+            "required": true
         }
     }
 };

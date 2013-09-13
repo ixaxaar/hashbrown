@@ -173,7 +173,7 @@ TeamSchema.methods.addUser = function(user, fn) {
 
         var that = this;
         entity.addtoTeam(user, this.name, function(err, u) {
-            if (!err && u) {
+            if (!err && u && !_.contains(that.users, u.uid)) {
                 that.users.push(u.uid);
                 that.save(function(err, sthat) {
                     if (!err && sthat) fn(null, sthat);
@@ -486,7 +486,7 @@ exports.getAllUsers = getAllUsers;
 var createTeam = function(user, json, fn) {
     if (validate(json, createTeamSchema)) {
         Organization.findOne({ name: user.org }, function(err, org) {
-            if (!err && org) {
+            if (!err && org && user.perm[0].admin >= permissions.mgr) {
 //                verify(user, org, function(err) {
 //                    if (!err) {
                         org.createTeam(user, json.name,
@@ -503,7 +503,7 @@ var createTeam = function(user, json, fn) {
 //                    }
 //                    else fn(false, 'User does not have permission to do that');
 //                });
-            } else fn(false, 'No such organization exists');
+            } else fn(false, 'No such organization exists or permission denied');
         });
     }
     else fn(false, 'Request format is wrong');
@@ -528,7 +528,7 @@ var addUser = function(granter, json, fn) {
     if (validate(json, addUserSchema)) {
         findOrganization(granter.org, function(err, org) {
             console.log(granter.org)
-            if (!err && org) {
+            if (!err && org  && granter.perm[0].admin >= permissions.mgr) {
                 org.findTeam(json.team, function(err, t) {
                     if (!err && t) {
                         entity.findByUsername(json.name, function(err,  u) {
@@ -538,7 +538,7 @@ var addUser = function(granter, json, fn) {
                                     if (!err) {
                                         // todo: prevent one user to be added multiple times
                                         t.addUser(u, function(err, au) {
-                                            if (!err) fn(null, { useruid: au.children });
+                                            if (!err) fn(null, { useruid: au.users });
                                             else fn(false, err);
                                         });
                                     }
@@ -551,7 +551,7 @@ var addUser = function(granter, json, fn) {
                     else fn(false, 'Could not find team');
                 });
             }
-            else fn(false, 'Could not find organization');
+            else fn(false, 'Could not find organization or permission denied');
         });
     }
     else fn(false, 'Request format is wrong');
@@ -579,15 +579,17 @@ var changeTeamOwner = function(granter, json, fn) {
                 org.findTeam(json.team, function(err, t) {
                     if (!err && t) {
                         verify(granter, t, function(err) {
-                            entity.findByUsername(json.name, function(err, u) {
-                                if (!err && u ) t.setOwner(u, function(err, t) {
-                                    if (!err && t) t.save(function(err, t) {
-                                        if (!err && t) fn(true, JSON.stringify(t));
-                                        else fn(false, 'Could not save');
+                            if (!err) entity.findByUsername(json.name, function(err, u) {
+                                if (!err && u && u.perm[0].admin >= permissions.admin)
+                                    t.setOwner(u, function(err, t) {
+                                        if (!err && t) t.save(function(err, t) {
+                                            if (!err && t) fn(true, JSON.stringify(t));
+                                            else fn(false, 'Could not save');
+                                        });
                                     });
-                                });
-                                else fn(false, 'User not found');
-                            })
+                                else fn(false, 'User not found or not enough permissions');
+                            });
+                            else fn(false, 'Permission denied');
                         })
                     }
                     else fn(false, 'Could not find team');

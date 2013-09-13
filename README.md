@@ -18,6 +18,7 @@ http://localhost:3000/login
 }
 ```
 
+
 2. Create an organization (also creates a user e.g. 'org1'):
 http://localhost:3000/user
 ```JSON
@@ -33,6 +34,18 @@ http://localhost:3000/user
 	}
 }
 ```
+Response:
+```JSON
+{
+    request: "createorg"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+       useruid: "org1"
+    }
+}
+```
+
 
 3. Add users to your organization (login via user org1):
 http://localhost:3000/users
@@ -41,11 +54,23 @@ http://localhost:3000/users
 	"request":"add",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
 	"body": {
-	        "username": "org1u1",
+	        "username": "u2@org1",
 	        "password": "123"
 	}
 }
 ```
+Response:
+```JSON
+{
+    request: "add"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+       uid: "u2@org1"
+    }
+}
+```
+
 
 4. Promote user:
 http://localhost:3000/users
@@ -54,9 +79,21 @@ http://localhost:3000/users
 	"request":"promote",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
 	"body": {
-	        "username": "u1@org1",
-	        "permission": "admin"
+        "username": "u1@org1",
+        "permission": "admin"
 	}
+}
+```
+Response:
+```JSON
+{
+    request: "promote"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+        uid: "u1@org1"
+        permission: 16
+    }
 }
 ```
 
@@ -73,8 +110,19 @@ http://localhost:3000/users
 	}
 }
 ```
+Response:
+```JSON
+{
+    request: "grant"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+        uid: "u1@org1"
+    }
+}
+```
 
-5. Revoke kingdom permissions to a user:
+6. Revoke kingdom permissions to a user:
 http://localhost:3000/users
 ```JSON
 {
@@ -87,21 +135,45 @@ http://localhost:3000/users
 	}
 }
 ```
-
-6. Re-associate a user to a different parent:
-http://localhost:3000/users
+Response:
 ```JSON
 {
-	"request":"reassociate",
-	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
-	"body": {
-	        "username": "org1u1",
-	        "newParent": "u1@org1"
-	}
+    request: "grant"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+        uid: "u1@org1"
+    }
 }
 ```
 
-7. Delete a user:
+
+7. Re-associate a user to a different parent:
+http://localhost:3000/users
+```JSON
+{
+    "request":"reassociate",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+            "username": "u1@org1",
+            "newParent": "u2@org1"
+    }
+}
+```
+Response:
+```JSON
+{
+    request: "reassociate"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+        uid: "u1@org1"
+        parent: "u2@org1"
+    }
+}
+```
+
+8. Delete a user:
 http://localhost:3000/users
 ```JSON
 {
@@ -112,23 +184,46 @@ http://localhost:3000/users
 	}
 }
 ```
+Response:
+```JSON
+{
+    request: "delete"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+       uid: "u1@org1"
+    }
+}
+```
 
-8. Create a team:
+9. Create a team:
 http://localhost:3000/user
 ```JSON
 {
 	"request":"addteam",
 	"uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
 	"body": {
-	        "parent": "t1@org1",
-	        "name": "t7@org1",
+	        "parent": "",
+	        "name": "t1@org1",
 	        "dbName": "team1",
 	        "dbConnection": "mongodb://localhost"
 	}
 }
 ```
+Response:
+```JSON
+{
+    request: "addteam"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+        useruid: "org1"
+        teamname: "t1@org1"
+    }
+}
+```
 
-9. Add a user to a team:
+10. Add a user to a team:
 http://localhost:3000/team
 ```JSON
 {
@@ -140,8 +235,22 @@ http://localhost:3000/team
 	}
 }
 ```
+```JSON
+{
+    request: "adduser"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: false
+    msg: {
+        useruid: [4]
+        0:  "u2@org1"
+        1:  "u3@org1"
+        2:  "u4@org1"
+        3:  "u1@org1"
+    }
+}
+```
 
-10. Change a team's owner:
+11. Change a team's owner (presently responds with everything, will sort that out...):
 http://localhost:3000/team
 ```JSON
 {
@@ -153,8 +262,17 @@ http://localhost:3000/team
 	}
 }
 ```
+Response:
+```JSON
+{
+    request: "changeowner"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: "{"__v":0,"_id":"52330c7487f2521279000021","dbConnection":"mongodb://localhost","name":"t3@org1","orgName":"org1","owner":"u1@org1","children":[],"users":[],"dbName":"team3","uuid":"f502e252-94c2-43ff-aa2f-a10782dada2b"}"
+}
+```
 
-11. Get the whole team structure, perhaps the first thing to be called before any mgmt APIs:
+12. Get the whole team structure, perhaps the first thing to be called before any mgmt APIs:
 http://localhost:3000/team
 ```JSON
 {
@@ -165,6 +283,26 @@ http://localhost:3000/team
 	}
 }
 ```
+```JSON
+{
+    request: "getallusers"
+    uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
+    success: true
+    msg: {
+        owner: "org1"
+        name: "t1@org1"
+        dbConnection: "mongodb://localhost"
+        databaseName: "team1"
+        users: [4]
+                0:  "u2@org1"
+                1:  "u3@org1"
+                2:  "u4@org1"
+                3:  "u1@org1"
+        children: [0]
+    }
+}
+```
+
 
 Winterfell APIs:
 =========
