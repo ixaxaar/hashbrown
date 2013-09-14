@@ -200,15 +200,17 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
 
         // commit to DB
         this.save(function(err, t) {
-            if (!err && t) fn(true, t);
+            if (!err && t)  {
+                fn(true, t);
+
+                // fire hooks based on type of feed
+                var timeline = require('./timeline');
+                if (this.private) timeline.userFeedStackHook(user, t);
+                else if (this.broadcast) timeline.broadcastFeedStackHook(user, t);
+                else timeline.teamFeedStackHook(user, t);
+            }
             else fn(false, 'Could not save ' + err.message);
         });
-
-        // fire hooks based on type of feed
-        var timeline = require('./timeline');
-        if (this.private) timeline.userFeedStackHook(user, this);
-        else if (this.broadcast) timeline.broadcastFeedStackHook(user, this);
-        else timeline.teamFeedStackHook(user, this);
     }
     else fn(false, 'Request format is wrong');
 };
@@ -357,7 +359,15 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
         this.children.push(c);
         this.modified = Date.now();
         this.save(function(err, f) {
-            if (!err || f) fn(true, f);
+            if (!err || f) {
+                fn(true, f);
+
+                // fire hooks based on type of feed
+                var timeline = require('./timeline');
+                if (this.private) timeline.userFeedStackHook(user, f);
+                else if (this.broadcast) timeline.broadcastFeedStackHook(user, f);
+                else timeline.teamFeedStackHook(user, f);
+            }
             else fn(false, 'Could not add child feed');
         });
     }
@@ -389,7 +399,15 @@ FeedSchema.methods.removeChild = function(json, fn) {
                 popped.pop();
                 while(popped.length) that.children.push(popped.pop());
                 that.save(function(err, st) {
-                    if (!err) fn(true, st);
+                    if (!err) {
+                        fn(true, st);
+
+                        // fire hooks based on type of feed
+                        var timeline = require('./timeline');
+                        if (this.private) timeline.userFeedStackHook(user, st);
+                        else if (this.broadcast) timeline.broadcastFeedStackHook(user, st);
+                        else timeline.teamFeedStackHook(user, st);
+                    }
                     else fn(false, 'Could not delete child feed');
                 });
                 return;

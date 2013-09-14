@@ -110,7 +110,6 @@ UserSchema.methods.createUser = function(granter, uid, hash, fn) {
                         fn(null, that);
                     } else {
                         // for all other users find the parent from the requestor
-                        granter.children.push(that.uid);
                         that.perm[0].perm = [permissions.none];
                         that.perm[0].admin = permissions.none;
                         that.children = [];
@@ -457,7 +456,13 @@ createUser = function(granter, json, fn) {
             if (err || !u) fn(false, err);
             else
                 u.save(function(err, u) {
-                    if (!err && u) fn(true, { uid: u.uid });
+                    if (!err && u) {
+                        granter.children.push(u.uid);
+                        granter.save(function(err) {
+                            if (!err) fn(true, { uid: u.uid });
+                            else fn(false, err);
+                        });
+                    }
                     else fn(false, err);
                 });
         });

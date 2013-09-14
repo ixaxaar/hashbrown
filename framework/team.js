@@ -487,22 +487,22 @@ var createTeam = function(user, json, fn) {
     if (validate(json, createTeamSchema)) {
         Organization.findOne({ name: user.org }, function(err, org) {
             if (!err && org && user.perm[0].admin >= permissions.mgr) {
-//                verify(user, org, function(err) {
-//                    if (!err) {
-                        org.createTeam(user, json.name,
-                            json.dbConnection, json.dbName, json.parent, function(err, team) {
-                                if (!err && team) {
-                                    var response = {
-                                        "useruid": user.uid,
-                                        "teamname": team.name
-                                    };
-                                    fn(true, response);
-                                }
-                                else fn(false, err);
-                            });
-//                    }
-//                    else fn(false, 'User does not have permission to do that');
-//                });
+                // POLICY: defaults to organization's database unless otherwise specified
+                if (!json.dbConnection || !json.dbName) {
+                    json.dbConnection = org.dbConnection;
+                    json.dbName = org.dbName;
+                }
+                org.createTeam(user, json.name,
+                    json.dbConnection, json.dbName, json.parent, function(err, team) {
+                        if (!err && team) {
+                            var response = {
+                                "useruid": user.uid,
+                                "teamname": team.name
+                            };
+                            fn(true, response);
+                        }
+                        else fn(false, err);
+                    });
             } else fn(false, 'No such organization exists or permission denied');
         });
     }

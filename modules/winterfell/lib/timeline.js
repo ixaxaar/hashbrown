@@ -74,6 +74,7 @@ var feedStackElement = function(feed) {
 /////////////////////////////////////
 
 var userFeedStack = function(user) {
+    user = user || {};
     this.name           = user.uid      || '';
     this.org            = user.org      || '';
     this.key            = (!!user) && keyBuilder(user, 'p') || '';
@@ -81,9 +82,13 @@ var userFeedStack = function(user) {
     this.stack          = [];
 };
 exports.userFeedStackHook = function(user, feed) {
+    if (!feed || !user) return;
     client.get(keyBuilder(user, 'p'), function(err, data) {
         if (!err && data) {
             data = JSON.parse(data);
+            // reject the previous version of this post if it exists
+            data.stack = _.reject(data.stack, function(st) { return st.uuid === feed.uuid });
+            // add the new feed onto the stack
             data.stack.push(new feedStackElement(feed));
             client.setex(data.key, data.ttl, JSON.stringify(data),
                 function(err) { log('error', err) });
@@ -100,6 +105,7 @@ exports.userFeedStackHook = function(user, feed) {
 
 // for team posts, each team has one - very frequent access
 var teamFeedStack = function(team) {
+    team = team || {};
     this.name           = team.name         || '';
     this.org            = team.org          || '';
     this.key            = (!!team) && keyBuilder(team, 't') || '';
@@ -107,10 +113,14 @@ var teamFeedStack = function(team) {
     this.stack          = [];
 };
 exports.teamFeedStackHook = function(user, feed) {
+    if (!feed || !user) return;
     feed.teams.forEach(function(t) {
         client.get(keyBuilder2(user, t, 't'), function(err, data) {
             if (!err && data) {
                 data = JSON.parse(data);
+                // reject the previous version of this post if it exists
+                data.stack = _.reject(data.stack, function(st) { return st.uuid === feed.uuid });
+                // add the new feed onto the stack
                 data.stack.push(new feedStackElement(feed));
                 client.setex(data.key, data.ttl, JSON.stringify(data),
                     function(err) { log('error', err) });
@@ -131,6 +141,7 @@ exports.teamFeedStackHook = function(user, feed) {
 
 // organization-level broadcasts
 var broadcastFeedStack = function(org) {
+    org = org || {};
     this.name           = org.name          || '';
     this.org            = org.org           || '';
     this.key            = (!!org) && keyBuilder(org, 'b') || '';
@@ -138,9 +149,13 @@ var broadcastFeedStack = function(org) {
     this.stack          = [];
 };
 exports.broadcastFeedStackHook = function(user, feed) {
+    if (!feed || !user) return;
     client.get(keyBuilder(user, 'b'), function(err, data) {
         if (!err && data) {
             data = JSON.parse(data);
+            // reject the previous version of this post if it exists
+            data.stack = _.reject(data.stack, function(st) { return st.uuid === feed.uuid });
+            // add the new feed onto the stack
             data.stack.push(new feedStackElement(feed));
             client.setex(data.key, data.ttl, JSON.stringify(data),
                 function(err) { log('error', err) });
@@ -235,7 +250,7 @@ var teamTimelineBuilder = function(team, slab, fn) {
                 });
                 // well, feed it back to the caller first, then commit it into cache
                 fn && fn(true, tfs);
-                client.setex(keyBuilder(team, 'p'), tfs, tfs.ttl, function(err) {
+                client.setex(keyBuilder(team, 'p'), tfs.ttl, JSON.stringify(tfs), function(err) {
                     if (err) log('warning', 'could not set user tieline into cache');
                 });
             }
@@ -277,7 +292,7 @@ var broadcastTimelineBuilder = function(user, slab, fn) {
                 });
                 // well, feed it back to the caller first, then commit it into cache
                 fn && fn(true, bfs);
-                client.setex(keyBuilder2(user, user.org, 'p'), bfs, bfs.ttl, function(err) {
+                client.setex(keyBuilder2(user, user.org, 'p'), bfs.ttl, JSON.stringify(bfs), function(err) {
                     if (err) log('warning', 'could not set user tieline into cache');
                 });
             }
@@ -422,7 +437,7 @@ var UserFeedConstructor = function() {
         var ufs = new userFeedStack(u);
         client.get(ufs.key, function(err, data) {
             if (!err && data) {}
-            else client.setex(ufs.key, ufs.ttl, ufs, function(err) {
+            else client.setex(ufs.key, ufs.ttl, JSON.stringify(ufs), function(err) {
                 (!err) || log('warning', 'Could not init user feed cache');
             });
         });
