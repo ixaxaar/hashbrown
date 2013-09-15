@@ -35,7 +35,7 @@ var sendException = function(e, recovery) {
     log('crit', "Exception occured while processing request");
 };
 
-
+ 
 var resultConstructor = function(request, uuid, msg, outcome) {
     this.request = request;
     this.uuid = uuid;
