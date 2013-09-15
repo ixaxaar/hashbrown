@@ -146,6 +146,20 @@ var checkout = function (conn, user, uniqueId, lock, fn) {
     else fn('Invalid parameters');
 };
 
+var getLatest = function (conn, user, uniqueId, fn) {
+    conn = conn || mongoose;
+
+    var history = conn.model('history');
+    if (uniqueId) {
+        history.findOne({ name: uniqueId }, function(err, h) {
+            if (h) fn(null, h.timeline[_.last(h.versions)]);
+            else fn('Documents history does not exist');
+        });
+    }
+    else fn('Invalid parameters');
+};
+
+
 var checkoutAndLock = function (conn, user, uniqueId, fn) {
     checkout(conn, user, uniqueId, true, fn);
 };
@@ -160,26 +174,15 @@ var pullRequest = function(conn, user, uniqueId, fn) {
             var requestsAccpeted = _.filter(h.timeline, function(_h) {
                 return !!(_h.user === user && _h.action === actions.acceptPull);
             });
-
-            // sort all the accepted pull requests
-            var sortAcceptedPullrequest = _.sortBy(requestsAccpeted, function(r) {
-                return r.changed;
-            });
-
-            // okay so we got the lastaccepted pull request here
-            // next thing we want are all the checkins done by user
-            // after this pull was requested
-            // map last-acc-pull -> pull -> [checkins]
-            var lastAcceptedPullrequest = _.last(sortAcceptedPullrequest) || {};
-            var lastPull = h.timeline[lastAcceptedPullrequest.related] || {};
-            var timeThreshold = lastPull.changed || 0;
+            var lastRequestAcceptedIndex = requestsAccpeted ? _.last(requestsAccpeted).index : 0;
 
             // find all the user's checkins after the last pulled checkin
             var commitsByUser = _.filter(h.timeline, function(_h) {
                 return !!(_h.user === user &&
                     _h.action === actions.checkin &&
-                    _h.changed > timeThreshold);
+                    _h.index > lastRequestAcceptedIndex);
             });
+
             var commits = [];
             commitsByUser.forEach(function(c) { commits.push(c.index) } );
 
@@ -224,7 +227,14 @@ var acceptPullRequest = function(conn, user, uniqueId, number, fn) {
                     related: [index],
                     index: h.timeline.length
                 }) );
-                h.versions.push(h.timeline.length - 1);
+                // determine the last version
+                var last_ver = 0;
+                try {
+                    console.log(h.timeline[_.last(h.timeline[index].related)])
+                    last_ver = h.timeline[_.last(h.timeline[index].related)].index;
+                } catch (e) { last_ver = 0; }
+                console.log(last_ver)
+                if (last_ver) h.versions.push(last_ver);
                 h.save(fn);
             }
             else fn('Documents checkin does not exist');
@@ -300,6 +310,41 @@ var enableHistory = function(uniqueId) {
     }
 };
 
+// POLICY: controversial area, can we delete feeds associated with history?
+var purgeDoc = function(conn, user, doc, fn) {
+    conn = conn || mongoose;
+
+    var history = conn.model('history');
+    history.findOne({ name: doc.path }, function(err, h) {
+        if (h) {
+            h.timeline.forEach(function(s) {
+                if (s.uid === doc._id) s.uid = null;
+            });
+
+            // keep on popping till the last remaining version
+            // points to something that exists
+            while(1) {
+                if (h.timeline[_.last(h.versions)] === null)
+                    h.versions.pop();
+                else break;
+            }
+
+            fn && fn(null);
+        }
+        else fn && fn('Documents history does not exist');
+    });
+};
+
+var purgeHistory = function(conn, user, uniqueId, fn) {
+    conn = conn || mongoose;
+
+    var history = conn.model('history');
+    history.findOne({ name: uniqueId }, function(err, h) {
+        if (h && h.owner === user) h.remove(fn);
+        else fn && fn('Documents history does not exist');
+    });
+};
+
 var History = function(schema) {
     // add these fields to the schema
     // versioned: indicates whether a document is versioned
@@ -310,11 +355,14 @@ var History = function(schema) {
     // add these schema methods
     schema.methods.__checkin              = checkin;
     schema.methods.__checkout             = checkout;
+    schema.methods.__purgeDoc             = purgeDoc;
+    schema.methods.__purgeHistory         = purgeHistory;
     schema.methods.__checkoutAndLock      = checkoutAndLock;
 //    schema.methods.__checkinAndUnlock     = checkinAndUnlock;
     schema.methods.__pullRequest          = pullRequest;
     schema.methods.__acceptPullRequest    = acceptPullRequest;
     schema.methods.__rejectPullRequest    = rejectPullRequest;
+    schema.methods.__getLatest            = getLatest;
     schema.methods.__getHistory           = getHistory;
     schema.methods.__getFullHistory       = getFullHistory;
     schema.methods.__enableHistory        = enableHistory;

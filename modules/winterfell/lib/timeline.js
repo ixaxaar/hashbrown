@@ -43,9 +43,12 @@ client.on("error", errorHandler);
 // and memory cannot be defined but it defines mankind ;)
 
 /////////////////////////////////////
-//    Cache size configuration
+//    Cache size and tme-to-live configuration
 /////////////////////////////////////
 var RECENT_FEEDLIST_SIZE = 20;
+var TTL_ONE_DAY = 86400;
+var TTL_TWO_HOURS = 7200;
+var TTL_MIN_BEFORE_REFRESH = 7200;
 
 var keyBuilder = function(entity, type) {
     return entity.org + ":" + type + ":" + (entity.name || entity.uid);
@@ -176,133 +179,131 @@ exports.broadcastFeedStackHook = function(user, feed) {
 /////////////////////////////////////
 
 var userTimelineBuilder = function(user, slab, fn) {
-    var cont = true;
-
     // see if the cache already contains our data
     if (!slab) client.get(keyBuilder(user, 'p'), function(err, data) {
         data = JSON.parse(data);
-        if (!err && data && data.stack && data.stack.length > RECENT_FEEDLIST_SIZE/2)
+        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2) {
             fn && fn(true, data);
-        else cont = false;
-    });
+            // reset the data so that the ttl is reset
+            if (client.ttl(data.key) < TTL_MIN_BEFORE_REFRESH)
+                client.setex(data.key, data.ttl, JSON.stringify(data), function(err) { } );
+        }
+        else {
+            // construct the query
+            var query = Feed.find({});
+            query.where('org', user.org);
+            query.where('private', false);
+            query.or([{ 'owner': user.uid, 'acl': user.uid }]);
+            query.skip(slab * RECENT_FEEDLIST_SIZE);
+            query.limit(RECENT_FEEDLIST_SIZE);
+            query.sort({ updated: -1 });
 
-    if (cont) {
-        // construct the query
-        var query = Feed.find({});
-        query.where('acl', user.uid);
-        query.and([{ org: user.org }]);
-        query.skip(slab * RECENT_FEEDLIST_SIZE);
-        query.limit(RECENT_FEEDLIST_SIZE);
-        query.sort({ updated: -1 });
-
-        // execute the query
-        query.exec(function(err, docs) {
-            if (!err && docs.length) {
-                var ufs = new userFeedStack(user);
-                docs.forEach(function(d) {
-                    ufs.stack.push(JSON.stringify(new feedStackElement(d)));
-                });
-                // well, feed it back to the caller first, then commit it into cache
-                fn && fn(true, ufs);
-
-                // cache only the first slab, not the whole thing
-                if (!slab)
-                    client.setex(keyBuilder(user, 'p'), ufs.ttl, JSON.stringify(ufs), function(err) {
-                        if (err) console.log(err);
+            // execute the query
+            query.exec(function(err, docs) {
+                if (!err && docs.length) {
+                    console.log(docs.length)
+                    var ufs = new userFeedStack(user);
+                    docs.forEach(function(d) {
+                        ufs.stack.push(JSON.stringify(new feedStackElement(d)));
                     });
-                else console.log('agdasg')
-            }
-            else {
-                log('warning', 'Could not find any records');
-                fn && fn(false, err);
-            }
-        });
-    }
-    else fn(false, 'logic error');
+                    // well, feed it back to the caller first, then commit it into cache
+                    fn && fn(true, ufs);
+
+                    // cache only the first slab, not the whole thing
+                    if (!slab)
+                        client.setex(keyBuilder(user, 'p'), ufs.ttl, JSON.stringify(ufs), function(err) {
+                            if (err) console.log(err);
+                        });
+                }
+                else {
+                    log('warning', 'Could not find any records');
+                    fn && fn(false, err);
+                }
+            });
+        }
+    });
 };
 exports.userTimelineBuilder = userTimelineBuilder;
 
 var teamTimelineBuilder = function(team, slab, fn) {
-    var cont = true;
-
     // see if the cache already contains our data
     if (!slab) client.get(keyBuilder(team, 't'), function(err, data) {
-        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2)
+        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2) {
             fn && fn(true, data);
-        else cont = false;
+            // reset the data so that the ttl is reset
+            if (client.ttl(data.key) < TTL_MIN_BEFORE_REFRESH)
+                client.setex(data.key, data.ttl, data, function(err) { } );
+        }
+        else {
+            // construct the query
+            var query = Feed.find({});
+            query.where('teams', team.name);
+            query.and([{ org: team.org }]);
+            query.sort({ updated: -1 });
+            query.skip(slab * RECENT_FEEDLIST_SIZE);
+            query.limit(RECENT_FEEDLIST_SIZE);
+
+            // execute the query
+            query.exec(function(err, docs) {
+                if (!err && docs.length) {
+                    var tfs = new teamFeedStack(team);
+                    docs.forEach(function(d) {
+                        tfs.stack.push(JSON.stringify(new feedStackElement(d)));
+                    });
+                    // well, feed it back to the caller first, then commit it into cache
+                    fn && fn(true, tfs);
+                    client.setex(keyBuilder(team, 'p'), tfs.ttl, JSON.stringify(tfs), function(err) {
+                        if (err) log('warning', 'could not set user tieline into cache');
+                    });
+                }
+                else {
+                    log('warning', 'Could not find any records');
+                    fn && fn(false, err);
+                }
+            });
+        }
     });
-
-    if (cont) {
-        // construct the query
-        var query = Feed.find({});
-        query.where('teams', team.name);
-        query.and([{ org: team.org }]);
-        query.sort({ updated: -1 });
-        query.skip(slab * RECENT_FEEDLIST_SIZE);
-        query.limit(RECENT_FEEDLIST_SIZE);
-
-        // execute the query
-        query.exec(function(err, docs) {
-            if (!err && docs.length) {
-                var tfs = new teamFeedStack(team);
-                docs.forEach(function(d) {
-                    tfs.stack.push(JSON.stringify(new feedStackElement(d)));
-                });
-                // well, feed it back to the caller first, then commit it into cache
-                fn && fn(true, tfs);
-                client.setex(keyBuilder(team, 'p'), tfs.ttl, JSON.stringify(tfs), function(err) {
-                    if (err) log('warning', 'could not set user tieline into cache');
-                });
-            }
-            else {
-                log('warning', 'Could not find any records');
-                fn && fn(false, err);
-            }
-        });
-    }
-    else fn(false, 'logic error');
 };
 exports.teamTimelineBuilder = teamTimelineBuilder;
 
 var broadcastTimelineBuilder = function(user, slab, fn) {
-    var cont = true;
-
     // see if the cache already contains our data
     if (!slab) client.get(keyBuilder2(user, user.org, 't'), function(err, data) {
-        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2)
+        if (!err && data && data.stack.length > RECENT_FEEDLIST_SIZE/2) {
             fn && fn(true, data);
-        else cont = false;
+            // reset the data so that the ttl is reset
+            if (client.ttl(data.key) < TTL_MIN_BEFORE_REFRESH)
+                client.setex(data.key, data.ttl, data, function(err) { } );
+        }
+        else {
+            // construct the query
+            var query = Feed.find({});
+            query.where('broadcast', true);
+            query.and([{ org: user.org }]);
+            query.sort({ updated: -1 });
+            query.skip(slab * RECENT_FEEDLIST_SIZE);
+            query.limit(RECENT_FEEDLIST_SIZE);
+
+            // execute the query
+            query.exec(function(err, docs) {
+                if (!err && docs.length) {
+                    var bfs = new broadcastFeedStack(user);
+                    docs.forEach(function(d) {
+                        bfs.stack.push(JSON.stringify(new feedStackElement(d)));
+                    });
+                    // well, feed it back to the caller first, then commit it into cache
+                    fn && fn(true, bfs);
+                    client.setex(keyBuilder2(user, user.org, 'p'), bfs.ttl, JSON.stringify(bfs), function(err) {
+                        if (err) log('warning', 'could not set user tieline into cache');
+                    });
+                }
+                else {
+                    log('warning', 'Could not find any records');
+                    fn && fn(false, err);
+                }
+            });
+        }
     });
-
-    if (cont) {
-        // construct the query
-        var query = Feed.find({});
-        query.where('broadcast', true);
-        query.and([{ org: user.org }]);
-        query.sort({ updated: -1 });
-        query.skip(slab * RECENT_FEEDLIST_SIZE);
-        query.limit(RECENT_FEEDLIST_SIZE);
-
-        // execute the query
-        query.exec(function(err, docs) {
-            if (!err && docs.length) {
-                var bfs = new broadcastFeedStack(user);
-                docs.forEach(function(d) {
-                    bfs.stack.push(JSON.stringify(new feedStackElement(d)));
-                });
-                // well, feed it back to the caller first, then commit it into cache
-                fn && fn(true, bfs);
-                client.setex(keyBuilder2(user, user.org, 'p'), bfs.ttl, JSON.stringify(bfs), function(err) {
-                    if (err) log('warning', 'could not set user tieline into cache');
-                });
-            }
-            else {
-                log('warning', 'Could not find any records');
-                fn && fn(false, err);
-            }
-        });
-    }
-    else fn(false, 'logic error');
 };
 exports.broadcastTimelineBuilder = broadcastTimelineBuilder;
 
