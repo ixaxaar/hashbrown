@@ -147,6 +147,7 @@ history(FeedSchema);
 FeedSchema.methods.CreateFeed = function(user, json, fn) {
     if (validate(json, createFeedSchema)) {
         this.owner = user.uid;
+        this.uuid = uuid.v4();
         this.children = [];
         this.org = user.org;
 
@@ -200,15 +201,17 @@ FeedSchema.methods.CreateFeed = function(user, json, fn) {
 
         // commit to DB
         this.save(function(err, t) {
-            if (!err && t) fn(true, t);
+            if (!err && t)  {
+                fn(true, t);
+
+                // fire hooks based on type of feed
+                var timeline = require('./timeline');
+                if (t.private) timeline.userFeedStackHook(user, t);
+                else if (this.broadcast) timeline.broadcastFeedStackHook(user, t);
+                else timeline.teamFeedStackHook(user, t);
+            }
             else fn(false, 'Could not save ' + err.message);
         });
-
-        // fire hooks based on type of feed
-        var timeline = require('./timeline');
-        if (this.private) timeline.userFeedStackHook(user, this);
-        else if (this.broadcast) timeline.broadcastFeedStackHook(user, this);
-        else timeline.teamFeedStackHook(user, this);
     }
     else fn(false, 'Request format is wrong');
 };
@@ -252,6 +255,18 @@ FeedSchema.methods.Checkin = function(user, json, fn) {
 
 FeedSchema.methods.Checkout = function(user, json, fn) {
     this.__checkout(null, user.uid, json.historyId, false, function(err, h) {
+        console.log(h)
+        if (!err && h.uid != '') Feed.findById(h.uid, function(err, cf) {
+            if (!err && cf) fn(true, cf);
+            else fn(false, err);
+        });
+        else fn(false, err || 'Last checked-in instance is a problem');
+    });
+};
+
+FeedSchema.methods.GetLatestVersion = function(user, json, fn) {
+    this.__getLatest(null, user.uid, json.historyId, function(err, h) {
+        console.log(h)
         if (!err && h.uid != '') Feed.findById(h.uid, function(err, cf) {
             if (!err && cf) fn(true, cf);
             else fn(false, err);
@@ -313,6 +328,9 @@ FeedSchema.methods.GetFullHistory = function(user, json, fn) {
 FeedSchema.methods.Delete = function(user, json, fn) {
     if (validate(json, removeFeedValidationSchema)) {
         var u = this.uuid;
+
+        if (this.versionuid) this.__purgeDoc(null, user, this);
+
         this.remove(function(err) {
             if (!err) fn(true, { "uuid": u });
             else fn(false, 'Could not remove');
@@ -337,6 +355,7 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
         var c = new ChildFeed({});
         c.owner = user.uid;
         c.created = Date.now();
+        c.uuid = uuid.v4();
 
         c.content = [new Content({})];
         c.content[0].description = json.content || "";
@@ -357,7 +376,15 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
         this.children.push(c);
         this.modified = Date.now();
         this.save(function(err, f) {
-            if (!err || f) fn(true, f);
+            if (!err || f) {
+                fn(true, f);
+
+                // fire hooks based on type of feed
+                var timeline = require('./timeline');
+                if (that.private) timeline.userFeedStackHook(user, f);
+                else if (that.broadcast) timeline.broadcastFeedStackHook(user, f);
+                else timeline.teamFeedStackHook(user, f);
+            }
             else fn(false, 'Could not add child feed');
         });
     }
@@ -374,25 +401,37 @@ FeedSchema.methods.AddChild = function(user, json, fn) {
     "uuid": ""              // uuid of this child post
  }
  */
-FeedSchema.methods.removeChild = function(json, fn) {
+FeedSchema.methods.removeChild = function(user, json, fn) {
     var that = this;
     if (validate(json, removeChildValidationSchema)) {
         var ctr = 0;
         var done = false;
-        console.log(that.children.length)
+
         that.children.forEach(function(c) {
             if (c.uuid === json.childuuid) {
-                done++;
-                var off = that.children.length - ctr;
-                var popped = [];
-                while(off--) popped.push(that.children.pop());
-                popped.pop();
-                while(popped.length) that.children.push(popped.pop());
-                that.save(function(err, st) {
-                    if (!err) fn(true, st);
-                    else fn(false, 'Could not delete child feed');
-                });
-                return;
+                if (that.owner === user.uid         ||
+                    c.owner === user.uid            ||
+                    user.perm[0].admin >= permissions.mgr) {
+                    done++;
+                    var off = that.children.length - ctr;
+                    var popped = [];
+                    while(off--) popped.push(that.children.pop());
+                    popped.pop();
+                    while(popped.length) that.children.push(popped.pop());
+                    that.save(function(err, st) {
+                        if (!err) {
+                            fn(true, st);
+
+                            // fire hooks based on type of feed
+                            var timeline = require('./timeline');
+                            if (this.private) timeline.userFeedStackHook(user, st);
+                            else if (this.broadcast) timeline.broadcastFeedStackHook(user, st);
+                            else timeline.teamFeedStackHook(user, st);
+                        }
+                        else fn(false, 'Could not delete child feed');
+                    });
+                    return;
+                }
             }
             ctr++;
         });

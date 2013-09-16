@@ -1,4 +1,5 @@
 
+var _ = require('underscore');
 
 var timeline = require('./timeline');
 var feed = require('./feed');
@@ -43,7 +44,9 @@ var resultConstructor = function(request, uuid, msg, outcome) {
 };
 
 var requestResponder = function(req, res, result, msg) {
-    var r = new resultConstructor(req.request, req.uuid, msg, result);
+    var r = new resultConstructor(req.body.request, req.body.uuid, msg, result);
+
+    log('debug', 'sending \n' + JSON.stringify(r));
 
     if (validate(r, resultConstructorValidatorSchema)) {
         res.send(r);
@@ -80,6 +83,11 @@ var feedRequestRouter = function(req, res, next) {
                 case 'checkoutfeed':
                     var F = new feed.Feed({});
                     F.Checkout(req.user, req.body.body, respond);
+                    break;
+
+                case 'getlatest':
+                    var F = new feed.Feed({});
+                    F.GetLatestVersion(req.user, req.body.body, respond);
                     break;
 
                 case 'pullrequest':
@@ -123,7 +131,7 @@ var feedRequestRouter = function(req, res, next) {
 
                 case 'deletechildfeed':
                     feed.findFeed(req.user, req.body.body.uuid, function(err, f) {
-                        if (!err && f) f.removeChild(req.body.body, respond);
+                        if (!err && f) f.removeChild(req.user, req.body.body, respond);
                         else respond(false, 'Feed not found');
                     });
                     break;

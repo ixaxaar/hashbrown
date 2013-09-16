@@ -17,7 +17,10 @@ var mongoose = require('mongoose')
 
 // json schema validation - for request jsons
 var Validator = require('jsonschema').Validator;
-var v = new Validator();
+
+var winston = require('winston');
+global.log = winston.log;
+
 
 // Internal Dependencies
 var entity = require('./entity');
@@ -315,6 +318,7 @@ exports.openBlackGate = function(req, res, next) {
     var u = req.url.split('/')[1];
 
     if (req.isAuthenticated()) {
+        console.log(u)
         if (u != '') {
             // okay, so the user is authenticated,
             // check if user has at least access premissions
@@ -322,13 +326,14 @@ exports.openBlackGate = function(req, res, next) {
                 if (!err && k) {
                     Permission.calcMaxPermission(req.user, k, function(err, p) {
                         if ((!err) && (p >= Permission.access)) r = true;
+                        else log('error', req.user + ' does not have permission in this kingdom');
                     });
                 } else r = true;
             });
         } else r = true;
 
         if (r) return next();
-        else return res.redirect('/');
+        else return res.send(403);
     }
     else return res.redirect('/login');
 };

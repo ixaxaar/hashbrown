@@ -210,7 +210,7 @@ var createTeamSchema = {
     "type": "object",
     "properties": {
         "parent": { "type": "string" },
-        "name": { "type": "string" },
+        "name": { "type": "string", "required": true },
         "dbName": { "type": "string" },
         "dbConnection": { "type": "string" }
     }
@@ -235,7 +235,8 @@ var godCreatesAnOrgSchema  = {
         "hash": { "type": "string", "required": true },
         "kingdoms": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": { "type": "string" },
+            "required": true
         }
     }
 };
@@ -244,8 +245,8 @@ var changeTeamOwnerValidationSchema = {
     "id": "/changeTeamOwnerValidationSchema",
     "type": "object",
     "properties": {
-        "name": { "type": "string" },
-        "team": { "type": "string" }
+        "name": { "type": "string", "required": true },
+        "team": { "type": "string", "required": true }
     }
 };
 

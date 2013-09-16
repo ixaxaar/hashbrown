@@ -110,7 +110,6 @@ UserSchema.methods.createUser = function(granter, uid, hash, fn) {
                         fn(null, that);
                     } else {
                         // for all other users find the parent from the requestor
-                        granter.children.push(that.uid);
                         that.perm[0].perm = [permissions.none];
                         that.perm[0].admin = permissions.none;
                         that.children = [];
@@ -136,7 +135,7 @@ UserSchema.methods.deleteUser = function(granter, fn) {
             // either granter is user's baap or the user himself!
             if (!err || granter.uid === that.uid) {
                 // find and remove from the DB
-                User.findOne({ uuid: that.uuid }).remove(function(err, u) {
+                that.remove(function(err, u) {
                     // todo: after a user is deleted, his parent owns everything
                     if (!err) fn(null, u);
                     else fn('Could not find and delete user', null);
@@ -378,7 +377,6 @@ findKingdomByUrl = function(name, fn) {
         });
 
     if (!ret) {
-        log('info', 'Could not find kingdom ' + name);
         fn('Could not find kingdom', null);
     }
 };
@@ -458,7 +456,13 @@ createUser = function(granter, json, fn) {
             if (err || !u) fn(false, err);
             else
                 u.save(function(err, u) {
-                    if (!err && u) fn(true, { uid: u.uid });
+                    if (!err && u) {
+                        granter.children.push(u.uid);
+                        granter.save(function(err) {
+                            if (!err) fn(true, { uid: u.uid });
+                            else fn(false, err);
+                        });
+                    }
                     else fn(false, err);
                 });
         });
