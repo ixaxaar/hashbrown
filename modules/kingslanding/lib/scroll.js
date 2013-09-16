@@ -12,7 +12,7 @@ var scrollSchema = new Schema({
     actorName: String,
     teams: [String],
     receivers: [String],
-    broadcast: { type: Boolean, default: true } // is this a roadcast?
+    type: String
 });
 scrollSchema.index({ teams: 1, updated: -1 });
 
@@ -24,24 +24,35 @@ scrollSchema.methods.Create = function(contentjson, fn) {
     this.actor      = contentjson.actor || null;
     this.actorName  = contentjson.actorName || '';
 
-    if (contentjson.report)
-        this.broadcast = true;
-    else {
+    if (contentjson.report) {
+        this.type = 'log';
+
+        // a user's logs are accessible to the user's team-mates and higher-ups
         if (contentjson.teams)
             contentjson.teams.forEach(function(t) { this.teams.push(t) });
+    }
+    else if (contentjson.message) {
+        this.type = 'msg';
 
+        // this scroll is directed towards a specific set of users
         if (contentjson.receivers)
             contentjson.receivers.forEach(function(t) { this.receivers.push(t) });
+    }
+    else if (contentjson.private) {
+        this.type = 'private';
+    }
+    else {
+        // everyone can see this scroll
+        this.type = 'broadcast';
     }
 
     this.save(fn);
 };
 
+
 scrollSchema.methods.Destroy = function(fn) {
     this.remove(fn)
 };
 
-var scroll = function() {
-    var framework = require('../../../framework');
-};
+module.exports = exports = goose.model('scroll', scrollSchema);
 

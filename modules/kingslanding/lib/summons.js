@@ -1,7 +1,13 @@
 
+var events = require('events')
+    , eventEmitter = events.eventEmitter;
 
-var summons = function() {
-};
+var scroll = require('./scroll');
+
+var summons = function() { };
+
+// inherit from eventEmitter class
+summons.__proto__.prototype = eventEmitter.prototype;
 
 summons.prototype.receiver = function(receiver) {
     if (!this.org) this.org = receiver.org;
@@ -44,6 +50,30 @@ summons.prototype.msg = function(msg) {
 };
 
 summons.prototype.exec = function() {
-    var s = scroll();
-    scroll.create(this);
+    var s = new scroll({});
+    s.create(this);
 };
+
+var handleSummon = function(args) {
+    var argsJson    = JSON.parse(args);
+
+    // create a summoning
+    var s =  new summons();
+    if (argsJson.actor) s.actor(argsJson.actor);
+    if (argsJson.receivers) argsJson.receivers.forEach(function(r) { s.receiver(r) });
+    if (argsJson.teams) argsJson.teams.forEach(function(r) { s.team(r) });
+    if (argsJson.report) s.report();
+    if (argsJson.msg) s.msg(argsJson.msg);
+    s.exec();
+};
+
+// handle error event to prevent node from crashing
+summons.on('error', function() {});
+
+summons.on('notify', handleSummon);
+
+summons.prototype.notify = function(args) {
+    this.emit('notify', JSON.stringify(args));
+};
+
+modules.exports = exports = summons;
