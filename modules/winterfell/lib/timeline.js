@@ -232,13 +232,13 @@ var teamTimelineBuilder = function(team, slab, fn) {
             fn && fn(true, data);
             // reset the data so that the ttl is reset
             if (client.ttl(data.key) < TTL_MIN_BEFORE_REFRESH)
-                client.setex(data.key, data.ttl, data, function(err) { } );
+                client.setex(data.key, data.ttl, JSON.stringify(data), function(err) { } );
         }
         else {
             // construct the query
             var query = Feed.find({});
             query.where('teams', team.name);
-            query.and([{ org: team.org }]);
+            query.and([{ org: team.org, private: false }]);
             query.sort({ updated: -1 });
             query.skip(slab * RECENT_FEEDLIST_SIZE);
             query.limit(RECENT_FEEDLIST_SIZE);
@@ -273,7 +273,7 @@ var broadcastTimelineBuilder = function(user, slab, fn) {
             fn && fn(true, data);
             // reset the data so that the ttl is reset
             if (client.ttl(data.key) < TTL_MIN_BEFORE_REFRESH)
-                client.setex(data.key, data.ttl, data, function(err) { } );
+                client.setex(data.key, data.ttl, JSON.stringify(data), function(err) { } );
         }
         else {
             // construct the query
@@ -313,7 +313,7 @@ var tagTimelineBuilder = function(user, tags, slab, fn) {
     var query = Feed.find({});
     tags && tags.forEach(function(tag) { query.where("tags.name", tag) });
     query.where('org', user.org);
-    query.or([ { teams: user.teams }, { acl: user.uid } ]);
+    query.or([ { teams: user.teams }, { acl: user.uid }, { owner: user.uid } ]);
     query.sort({ updated: -1 });
     query.skip(slab * RECENT_FEEDLIST_SIZE);
     query.limit(RECENT_FEEDLIST_SIZE);
@@ -356,7 +356,7 @@ var docLister = function(user, fn) {
     var query = Feed.find({});
     query.where('versioned').equals("true");
     query.where('org', user.org);
-    query.or([ { teams: user.teams }, { acl: user.uid } ]);
+    query.or([ { teams: user.teams }, { acl: user.uid }, { owner: user.uid } ]);
     query.sort({ updated: -1 });
 
     query.exec(function(err, docs) {
@@ -410,7 +410,7 @@ var docSearcher = function(user, doc, slab, fn) {
     var query = Feed.find({});
     query.where('content.displayname', rx);
     query.where('org', user.org);
-    query.or([ { teams: user.teams }, { acl: user.uid } ]);
+    query.or([ { teams: user.teams }, { acl: user.uid }, { owner: user.uid } ]);
     query.skip(slab * RECENT_FEEDLIST_SIZE);
     query.limit(RECENT_FEEDLIST_SIZE);
     query.sort({ updated: -1 });
