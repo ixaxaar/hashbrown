@@ -2,17 +2,19 @@
 var goose = require('mongoose')
     , Schema = goose.Schema;
 
-
 var scrollSchema = new Schema({
     uuid: { type: String, default: uuid.v4() },
-    org: String, // the owner'S organization
     created: { type : Date, default: Date.now() },
-    content: [ContentSchema], // the content object
+    org: String,
+    content: String,
     actor: String,
     actorName: String,
     teams: [String],
     receivers: [String],
-    type: String
+    type: String,
+    file: String,
+    fileName: String,
+    votes: Number
 });
 scrollSchema.index({ teams: 1, updated: -1 });
 
@@ -23,18 +25,17 @@ scrollSchema.methods.Create = function(contentjson, fn) {
     this.content    = contentjson.msg || '';
     this.actor      = contentjson.actor || null;
     this.actorName  = contentjson.actorName || '';
+    this.votes      = 0;
 
     if (contentjson.report) {
-        this.type = 'log';
-
         // a user's logs are accessible to the user's team-mates and higher-ups
+        this.type = 'log';
         if (contentjson.teams)
             contentjson.teams.forEach(function(t) { this.teams.push(t) });
     }
     else if (contentjson.message) {
-        this.type = 'msg';
-
         // this scroll is directed towards a specific set of users
+        this.type = 'msg';
         if (contentjson.receivers)
             contentjson.receivers.forEach(function(t) { this.receivers.push(t) });
     }
@@ -46,6 +47,10 @@ scrollSchema.methods.Create = function(contentjson, fn) {
         this.type = 'broadcast';
     }
 
+    if (contentjson.file) {
+        this.file = contentjson.file;
+        this.filename = contentjson.filename;
+    }
     this.save(fn);
 };
 
