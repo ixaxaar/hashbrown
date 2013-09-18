@@ -16,7 +16,7 @@ var taleSchema = new Schema({
     teller:         String,
     tellerName:     String,
     tale:           ObjectId,
-    sayers:         [ObjectId]
+    says:           [ObjectId]
 });
 taleSchema.index({ teller: 1, updated: 1 });
 
@@ -44,9 +44,95 @@ taleSchema.methods.Create = function(user, tale, fn) {
 
 };
 
-//taleSchema.methods.Destroy
-//taleSchema.methods.Say
-//taleSchema.methods.Unsay
-//taleSchema.methods.Cheer
-//taleSchema.methods.Uncheer
+taleSchema.methods.Destroy = function(user, fn) {
+    this.remove(function(err, t) { fn(!err, err || that) });
+};
+
+taleSchema.methods.Say = function(user, saying, fn) {
+    var s = new scroll({});
+    s.Create({
+        org:        this.org,
+        content:    saying,
+        actor:      user.uid,
+        actorName:  user.profile[0].name || user.uid
+    }, function(err, sc) {});
+
+    this.says.push(s);
+    this.save(function(err, t) { fn(!err, err || that) });
+};
+
+taleSchema.methods.Unsay = function(user, uuid, fn) {
+    var that = this;
+
+    // only the commenter or the summoner can delete a comment
+    this.says = _.reject(this.says, function(d) {
+        if (user.uid === d.actor || user.uid === that.teller)
+            return d.uuid === uuid;
+        else return false;
+    });
+    this.markModified('says');
+    this.save(function(err, sc) { fn && fn(!err, err || that) });
+};
+
+taleSchema.methods.Cheer = function(user, uuid, fn) {
+    this.says.forEach(function(s) {
+        if (s.uuid === uuid) s.votes++;
+    });
+    this.save(function(err, sc) { fn && fn(!err, err || that) });
+};
+
+taleSchema.methods.Uncheer = function(user, uuid, fn) {
+    this.says.forEach(function(s) {
+        if (s.uuid === uuid) s.votes--;
+    });
+    this.save(function(err, sc) { fn && fn(!err, err || that) });
+};
+
+var tale = goose.model('tale', taleSchema);
+
+var findTale = function(request, fn) {
+    tale.findOne(request, fn);
+};
+
+exports.spawn = spawn = function(user, json, fn) {
+    findTale({ uuid: json.uuid }, function(err, c) {
+        if (!err && c) c.Create(user, json.tale, fn);
+        else fn(false, err);
+    });
+};
+
+exports.destroy = destroy = function(user, json, fn) {
+    findTale({ uuid: json.uuid }, function(err, c) {
+        if (!err && c) c.Destroy(user, fn);
+        else fn(false, err);
+    });
+};
+
+exports.say = say = function(user, json, fn) {
+    findTale({ uuid: json.uuid }, function(err, c) {
+        if (!err && c) c.Say(user, json.saying, fn);
+        else fn(false, err);
+    });
+};
+
+exports.unsay = unsay = function(user, json, fn) {
+    findTale({ uuid: json.uuid }, function(err, c) {
+        if (!err && c) c.Unsay(user, json.sayinguuid, fn);
+        else fn(false, err);
+    });
+};
+
+exports.cheer = cheer = function(user, json, fn) {
+    findTale({ uuid: json.uuid }, function(err, c) {
+        if (!err && c) c.Cheer(user, json.tale, fn);
+        else fn(false, err);
+    });
+};
+
+exports.uncheer = uncheer = function(user, json, fn) {
+    findTale({ uuid: json.uuid }, function(err, c) {
+        if (!err && c) c.Uncheer(user, json.tale, fn);
+        else fn(false, err);
+    });
+};
 

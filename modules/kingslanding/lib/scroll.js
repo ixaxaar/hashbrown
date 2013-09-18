@@ -51,7 +51,8 @@ scrollSchema.methods.Create = function(contentjson, fn) {
         this.file = contentjson.file;
         this.filename = contentjson.filename;
     }
-    this.save(fn);
+//    this.save(fn);
+    fn(null, this);
 };
 
 
