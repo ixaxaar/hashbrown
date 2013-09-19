@@ -17,7 +17,7 @@ var scrollSchema = new Schema({
     votes: Number
 });
 scrollSchema.index({ teams: 1, updated: -1 });
-
+scrollSchema.index({ actor: 1, updated: 1 });
 
 scrollSchema.methods.Create = function(contentjson, fn) {
     this.uuid       = uuid.v4();
@@ -43,8 +43,7 @@ scrollSchema.methods.Create = function(contentjson, fn) {
         this.type = 'private';
     }
     else {
-        // everyone can see this scroll
-        this.type = 'broadcast';
+        this.type = 'none';
     }
 
     if (contentjson.file) {

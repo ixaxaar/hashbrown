@@ -39,19 +39,18 @@ summons.prototype.actor = function(actor) {
     }
 };
 
-summons.prototype.report = function(report) {
-    if (report) {
-        this.report = true;
-    }
-};
-
-summons.prototype.msg = function(msg) {
-    this.msg = msg;
+summons.prototype.content = function(msg) {
+    this.content = msg;
 };
 
 summons.prototype.exec = function() {
+    // summons are logs of user activity
+    this.type = 'log';
     var s = new scroll({});
-    s.create(this);
+    s.Create(this, function (err, ss) {
+        s.save(function(err)
+            { if (err) console.warn('Could not save ' + JSON.stringify(err)) });
+    });
 };
 
 var handleSummon = function(args) {
@@ -62,8 +61,7 @@ var handleSummon = function(args) {
     if (argsJson.actor) s.actor(argsJson.actor);
     if (argsJson.receivers) argsJson.receivers.forEach(function(r) { s.receiver(r) });
     if (argsJson.teams) argsJson.teams.forEach(function(r) { s.team(r) });
-    if (argsJson.report) s.report();
-    if (argsJson.msg) s.msg(argsJson.msg);
+    if (argsJson.content) s.content(argsJson.content);
     s.exec();
 };
 

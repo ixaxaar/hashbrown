@@ -33,6 +33,7 @@ var validation = require('./validation')
 
 var council = require('./council');
 var tale = require('./tale');
+var timeline = require('./timeline');
 
 
 var sendException = function(e, recovery) {
@@ -223,10 +224,46 @@ var taleRequestRouter = function(req, res, next) {
 //    }
 };
 
+var timelineRequestRouter = function(req, res, next) {
+    req.accepts('application/json');
+
+//    try {
+    var respond = function(result, msg) {
+        result = !!result;
+        if (!msg) msg = result;
+
+        requestResponder(req, res, result, msg);
+    };
+
+    if (validate(req.body, requestValidatorSchema))
+        switch(req.body.request) {
+            case 'timeline':
+                timeline.timeline(req.user, respond);
+                break;
+
+            case 'usertimeline':
+                timeline.userTimeline(req.user, respond);
+                break;
+
+            default:
+                respond(false, 'Request format is wrong');
+                break;
+        }
+//    } catch (e) {
+//        sendException(e, function() {
+//            respond(false, 'Request format is wrong');
+//        });
+//    }
+};
+
+
+
 var kingslanding = function(app) {
     app.post(/\/council/, councilRequestRouter);
 
     app.post(/\/tale/, taleRequestRouter);
+
+    app.post(/\/timeline/, timelineRequestRouter);
 
 //    app.all("*", function(req, res) { res.send(404); });
 };

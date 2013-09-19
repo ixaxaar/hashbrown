@@ -21,7 +21,7 @@ var councilSchema = new Schema({
     conclusion:     ObjectId,
     accepted:       String
 });
-councilSchema.index({ summoner: 1, updated: 1 });
+councilSchema.index({ invited: 1, updated: 1 });
 
 
 councilSchema.methods.Invite = function(user, invited, fn) {
@@ -40,6 +40,7 @@ councilSchema.methods.Invite = function(user, invited, fn) {
             }, function(err, sc) {});
 
             this.invited.push(user.uid);
+            this.updated = Date.now();
             that.save(function(err, sc) { fn && fn(!err, err || that) });
         }
         else fn(false, 'User not found');
@@ -61,6 +62,7 @@ councilSchema.methods.Comment = function(user, comment, fn) {
         }, function(err, sc) {});
 
         that.discussion.push(s);
+        this.updated = Date.now();
         this.save(function(err, sc) { fn && fn(!err, err || that) });
     }
     else fn(false, 'Only invited individuals can comment');
@@ -76,6 +78,7 @@ councilSchema.methods.Uncomment = function(user, uuid, fn) {
         else return false;
     });
     this.markModified('discussion');
+    this.updated = Date.now();
     this.save(function(err, sc) { fn && fn(!err, err || that) });
 };
 
@@ -84,6 +87,7 @@ councilSchema.methods.Upvote = function(user, uuid, fn) {
         this.discussion.forEach(function(s) {
             if (s.uuid === uuid) s.votes++;
         });
+        this.updated = Date.now();
         this.save(function(err, sc) { fn && fn(!err, err || that) });
     }
     else fn(false, 'Only invited individuals can upvote');
@@ -94,6 +98,7 @@ councilSchema.methods.Downvote = function(user, uuid, fn) {
         this.discussion.forEach(function(s) {
             if (s.uuid === uuid) s.votes--;
         });
+        this.updated = Date.now();
         this.save(function(err, sc) { fn && fn(!err, err || that) });
     }
     else fn(false, 'Only invited individuals can downvote');
@@ -121,6 +126,7 @@ councilSchema.methods.Conclusion = function(user, comment, uuid, fn) {
         }, function(err, sc) {});
 
         this.accepted = s;
+        this.updated = Date.now();
         this.save(function(err, sc) { fn && fn(!err, err || that) });
     }
     else fn(false, 'Only the summoner can close this');
@@ -128,6 +134,7 @@ councilSchema.methods.Conclusion = function(user, comment, uuid, fn) {
 
 var council = goose.model('council', councilSchema);
 council.ensureIndexes();
+exports.council = council;
 
 var findCouncil = function(query, fn) {
     council.findOne(query, fn);

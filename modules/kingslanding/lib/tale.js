@@ -40,6 +40,7 @@ taleSchema.methods.Create = function(user, tale, fn) {
     }, function(err, sc) {});
 
     this.tale = s;
+    this.updated = Date.now();
     this.save(function(err, t) { fn(!err, err || that) });
 
 };
@@ -58,6 +59,7 @@ taleSchema.methods.Say = function(user, saying, fn) {
     }, function(err, sc) {});
 
     this.says.push(s);
+    this.updated = Date.now();
     this.save(function(err, t) { fn(!err, err || that) });
 };
 
@@ -71,6 +73,7 @@ taleSchema.methods.Unsay = function(user, uuid, fn) {
         else return false;
     });
     this.markModified('says');
+    this.updated = Date.now();
     this.save(function(err, sc) { fn && fn(!err, err || that) });
 };
 
@@ -78,6 +81,7 @@ taleSchema.methods.Cheer = function(user, uuid, fn) {
     this.says.forEach(function(s) {
         if (s.uuid === uuid) s.votes++;
     });
+    this.updated = Date.now();
     this.save(function(err, sc) { fn && fn(!err, err || that) });
 };
 
@@ -85,10 +89,12 @@ taleSchema.methods.Uncheer = function(user, uuid, fn) {
     this.says.forEach(function(s) {
         if (s.uuid === uuid) s.votes--;
     });
+    this.updated = Date.now();
     this.save(function(err, sc) { fn && fn(!err, err || that) });
 };
 
 var tale = goose.model('tale', taleSchema);
+exports.tale = tale;
 
 var findTale = function(request, fn) {
     tale.findOne(request, fn);
