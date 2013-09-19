@@ -27,37 +27,51 @@ var uuid = require('node-uuid');
 
 var _ = require('underscore');
 
-var pile = function(ttl, maxSize, replace) {
+var pile = function(key, ttl, maxSize) {
+    this.key = key;
     this.ttl = ttl;
     this.maxSize = maxSize;
-    this.replace = replace;
+    this.size = 0;
     this.pile = [];
 };
 
-var pileDoc = function(content) {
-    this.content = content;
-};
-
-pileDoc.prototype.save = function(callback) {
-    //
-};
-
-pile.prototype.driveIntoPile = function(content) {
+pile.prototype.drive = function(content) {
     content = content || {};
-    // delete the old content, if replace is enabled
-    if (this.replace) this.pile = _.reject(this.pile, function(p) { return p._id === content._id });
-    // pile up the new content
-    this.pile.push(content);
+    var that = this;
+
+    if (content.__piled) {
+        this.redisConnection.exists(content._id, function(e) {
+            if (!e) {
+                that.pile.push(that.key + content._id);
+                that.size++;
+            }
+            // note: this automatically replaces existing content
+            that.redisConnection.setex(that.key + content._id, that.ttl, JSON.stringify(content));
+        });
+    }
+
+    // in case maxSize is reached, shift the older ones
+    if (this.maxSize > this.size) {
+        var k = this.pile.shift();
+        this.redisConnection.del(this.key + content._id);
+    }
 };
 
-pile.prototype.getPile = function() {
-    return this.pile;
-};
+pile.prototype.getPile = function(num, iterator, fn) {
+    var that = this;
+    var p = [];
+    num = num || this.maxSize;
+    iterator = iterator || fn() {};
 
-pile.prototype.find = function(key, value) {
-    return _.find(this.pile, function(p) {
-        return (p[key] === value);
+    this.pile.forEach(function(pp) {
+        that.redisConnection.get(pp, function(err, data) {
+            if (!err && iterator(data)) {
+                try { p.push(JSON.parse(data)) } catch (e) {};
+                if (!--num) break;
+        });
     });
+
+    fn(p);
 };
 
 var PileDriver = function(redisOptions, mongoOptions) {
@@ -73,32 +87,30 @@ var PileDriver = function(redisOptions, mongoOptions) {
     mongoOptions = mongoOptions || goose;
     this.mongoConnection = mongoOptions.connection;
 
-    this.schemaName = '';
     this.pile = null;
 };
 
-
 PileDriver.prototype.enablePile = function(schemaName, schema, options) {
     options = options || {};
+
     if (!this.pile) {
         // this signifies whether piling is enabled, we take consent of course ;)
         schema.add({ __piled: { type: Boolean, default: true } });
     }
 
-    this.schemaName = schemaName;
+    this.key = schemaName;
 
     this.pile = this.pile       || 
         new pile(
-            options.ttl         || 86400,
-            options.maxSize     || 100,
-            options.replace     || true
+            options.key,
+            options.ttl         || 864000,  // ten days, in some cases, infinity is better
+            options.maxStack    || 100000   // maximum pile size
         );
 
     schema.methods.disablePile      = function() { this.__piled = false };
     schema.methods.getPile          = this.pile.getPile;
-    schema.methods.findInPile       = this.pile.find;
-    schema.methods.pile             = this.pile.driveIntoPile;
-    schema.post                     = this.pile.driveIntoPile;
+    schema.methods.pile             = this.pile.drive;
+    schema.post                     = this.pile.drive;
 };
 
 module.exports = exports = PileDriver;
