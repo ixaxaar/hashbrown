@@ -82,11 +82,12 @@ app.post('/login', function(req, res, next) {
         if (err) { return next(err) }
         if (!user) {
             console.log('error', info.message);
-            return res.redirect('/login');
+//            return res.redirect('/login');
+            return res.send(404);
         }
         req.logIn(user, function(err) {
             if (err) { return next(err); }
-            return res.redirect('/');
+            return res.send(200);
         });
     })(req, res, next);
 });

@@ -2,7 +2,7 @@
 var _ = require('underscore');
 
 var tale = require('./tale')
-    , taleModel = require('./tale.tale');
+    , taleModel = tale.tale;
 
 var council = require('./council')
     , councilModel = council.council;
@@ -49,8 +49,9 @@ var timeline = function(user, slab, fn) {
                     'tales':    tales,
                     'summons':  summons
                 };
+
                 // expected to always generate a successful reply
-                fn(true, JSON.stringify(reply));
+                fn && fn(true, JSON.stringify(reply));
             });
         });
     });
@@ -95,7 +96,7 @@ var userTimeline = function(user, slab, fn) {
                     'summons':  summons
                 };
                 // expected to always generate a successful reply
-                fn(true, JSON.stringify(reply));
+                fn && fn(true, JSON.stringify(reply));
             });
         });
     });

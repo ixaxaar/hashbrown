@@ -1439,6 +1439,333 @@ http://localhost:3000/winterfell/timeline
 }
 ```
 
+Kingslanding API:
+=========
+
+1. Create a tale:
+http://localhost:3000/kingslanding/tale
+```JSON
+{
+    "request":"create",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "tale": "Once upon a time, long long ago..."
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "create",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 0,
+    "tellerName": "u1@org1",
+    "teller": "u1@org1",
+    "org": "org1",
+    "_id": "523ca85f8dea596612000014",
+    "says": [],
+    "tale": [
+      {
+        "type": "none",
+        "votes": 0,
+        "actorName": "u1@org1",
+        "actor": "u1@org1",
+        "content": "Once upon a time, long long ago...",
+        "org": "org1",
+        "_id": "523ca85f8dea596612000015",
+        "receivers": [],
+        "teams": [],
+        "created": "2013-09-20T19:55:54.401Z",
+        "uuid": "e1921a55-1a2f-474e-b6c9-8a3b280170a6"
+      }
+    ],
+    "updated": "2013-09-20T19:56:15.323Z",
+    "created": "2013-09-20T19:55:54.404Z",
+    "uuid": "74ed4fca-a576-43b5-9635-e061e71a9d56"
+  }
+}
+```
+
+2. Destroy a tale:
+http://localhost:3000/kingslanding/tale
+```JSON
+{
+    "request":"destroy",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "e6607675-5afa-4162-850a-a825b4dcf72b"
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "destroy",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": false
+}
+```
+
+3. Say something to a tale:
+http://localhost:3000/kingslanding/tale
+```JSON
+{
+    "request":"say",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "74ed4fca-a576-43b5-9635-e061e71a9d56",
+        "saying": "a very vigilant entinel."
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "say",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 3,
+    "_id": "523ca85f8dea596612000014",
+    "org": "org1",
+    "teller": "u1@org1",
+    "tellerName": "u1@org1",
+    "says": [
+      {
+        "uuid": "61f6292f-a60c-4c77-9332-6a271c0a1216",
+        "created": "2013-09-20T20:05:34.151Z",
+        "teams": [],
+        "receivers": [],
+        "_id": "523caba920ae9c4314000014",
+        "org": "org1",
+        "content": "there was a sentinel...",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "votes": 0,
+        "type": "none"
+      },
+      {
+        "uuid": "dca97962-6824-4d1b-b2c3-480121e94f62",
+        "created": "2013-09-20T20:12:31.990Z",
+        "teams": [],
+        "receivers": [],
+        "_id": "523cac348d53d1ee14000014",
+        "org": "org1",
+        "content": "there was a sentinel...",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "votes": 0,
+        "type": "none"
+      },
+      {
+        "type": "none",
+        "votes": 0,
+        "actorName": "u1@org1",
+        "actor": "u1@org1",
+        "content": "a very vigilant entinel.",
+        "org": "org1",
+        "_id": "523cac4f8d53d1ee14000015",
+        "receivers": [],
+        "teams": [],
+        "created": "2013-09-20T20:12:31.990Z",
+        "uuid": "164783d5-1549-4d96-9551-5f5b04903111"
+      }
+    ],
+    "tale": [
+      {
+        "uuid": "e1921a55-1a2f-474e-b6c9-8a3b280170a6",
+        "created": "2013-09-20T19:55:54.401Z",
+        "teams": [],
+        "receivers": [],
+        "_id": "523ca85f8dea596612000015",
+        "org": "org1",
+        "content": "Once upon a time, long long ago...",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "votes": 0,
+        "type": "none"
+      }
+    ],
+    "updated": "2013-09-20T20:13:03.451Z",
+    "created": "2013-09-20T19:55:54.404Z",
+    "uuid": "74ed4fca-a576-43b5-9635-e061e71a9d56"
+  }
+}
+```
+
+4. Un-Say something to a tale:
+http://localhost:3000/kingslanding/tale
+```JSON
+{
+    "request":"unsay",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "74ed4fca-a576-43b5-9635-e061e71a9d56",
+        "sayinguuid": "dca97962-6824-4d1b-b2c3-480121e94f62"
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "unsay",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 4,
+    "_id": "523ca85f8dea596612000014",
+    "org": "org1",
+    "teller": "u1@org1",
+    "tellerName": "u1@org1",
+    "says": [
+      {
+        "uuid": "61f6292f-a60c-4c77-9332-6a271c0a1216",
+        "created": "2013-09-20T20:05:34.151Z",
+        "teams": [],
+        "receivers": [],
+        "_id": "523caba920ae9c4314000014",
+        "org": "org1",
+        "content": "there was a sentinel...",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "votes": 0,
+        "type": "none"
+      },
+      {
+        "uuid": "164783d5-1549-4d96-9551-5f5b04903111",
+        "created": "2013-09-20T20:12:31.990Z",
+        "teams": [],
+        "receivers": [],
+        "_id": "523cac4f8d53d1ee14000015",
+        "org": "org1",
+        "content": "a very vigilant entinel.",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "votes": 0,
+        "type": "none"
+      }
+    ],
+    "tale": [
+      {
+        "uuid": "e1921a55-1a2f-474e-b6c9-8a3b280170a6",
+        "created": "2013-09-20T19:55:54.401Z",
+        "teams": [],
+        "receivers": [],
+        "_id": "523ca85f8dea596612000015",
+        "org": "org1",
+        "content": "Once upon a time, long long ago...",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "votes": 0,
+        "type": "none"
+      }
+    ],
+    "updated": "2013-09-20T20:17:05.718Z",
+    "created": "2013-09-20T19:55:54.404Z",
+    "uuid": "74ed4fca-a576-43b5-9635-e061e71a9d56"
+  }
+}
+```
+
+5. Cheer a tale or a saying:
+http://localhost:3000/kingslanding/tale
+```JSON
+{
+    "request":"cheer",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "2a691f79-00f4-4ae8-8034-86d1c12a2c70"
+        // sayinguuid: "#" for cheering a saying
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "cheer",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 0,
+    "_id": "523cb17e7826328e17000014",
+    "org": "org1",
+    "teller": "u1@org1",
+    "tellerName": "u1@org1",
+    "says": [],
+    "tale": [
+      {
+        "uuid": "9d8a5f9c-0879-4da4-af81-a5486af0c4c4",
+        "created": "2013-09-20T20:35:07.404Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [
+          "u1@org1"
+        ],
+        "_id": "523cb17e7826328e17000015",
+        "org": "org1",
+        "content": "Once upon a time, long long ago...",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "none"
+      }
+    ],
+    "updated": "2013-09-20T20:36:08.031Z",
+    "created": "2013-09-20T20:35:07.406Z",
+    "uuid": "2a691f79-00f4-4ae8-8034-86d1c12a2c70"
+  }
+}
+```
+
+6 Un-Cheer a tale or a saying:
+http://localhost:3000/kingslanding/tale
+```JSON
+{
+    "request":"uncheer",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "2a691f79-00f4-4ae8-8034-86d1c12a2c70"
+        // sayinguuid: "#" for un-cheering a saying
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "uncheer",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 0,
+    "_id": "523cb17e7826328e17000014",
+    "org": "org1",
+    "teller": "u1@org1",
+    "tellerName": "u1@org1",
+    "says": [],
+    "tale": [
+      {
+        "uuid": "9d8a5f9c-0879-4da4-af81-a5486af0c4c4",
+        "created": "2013-09-20T20:35:07.404Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523cb17e7826328e17000015",
+        "org": "org1",
+        "content": "Once upon a time, long long ago...",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "none"
+      }
+    ],
+    "updated": "2013-09-20T20:40:37.392Z",
+    "created": "2013-09-20T20:35:07.406Z",
+    "uuid": "2a691f79-00f4-4ae8-8034-86d1c12a2c70"
+  }
+}
+```
+
 Response schema validator:
 =========
 

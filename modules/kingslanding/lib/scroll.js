@@ -2,6 +2,8 @@
 var goose = require('mongoose')
     , Schema = goose.Schema;
 
+var uuid = require('node-uuid');
+
 var scrollSchema = new Schema({
     uuid: { type: String, default: uuid.v4() },
     created: { type : Date, default: Date.now() },
@@ -14,7 +16,7 @@ var scrollSchema = new Schema({
     type: String,
     file: String,
     fileName: String,
-    votes: Number
+    votes: [String]
 });
 scrollSchema.index({ teams: 1, updated: -1 });
 scrollSchema.index({ actor: 1, updated: 1 });
@@ -22,10 +24,9 @@ scrollSchema.index({ actor: 1, updated: 1 });
 scrollSchema.methods.Create = function(contentjson, fn) {
     this.uuid       = uuid.v4();
     this.org        = contentjson.org;
-    this.content    = contentjson.msg || '';
+    this.content    = contentjson.content || '';
     this.actor      = contentjson.actor || null;
     this.actorName  = contentjson.actorName || '';
-    this.votes      = 0;
 
     if (contentjson.report) {
         // a user's logs are accessible to the user's team-mates and higher-ups

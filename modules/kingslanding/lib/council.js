@@ -16,9 +16,9 @@ var councilSchema = new Schema({
     summoner:       String,
     summonerName:   String,
     invited:        [String],
-    agenda:         ObjectId,
+    agenda:         [ObjectId],
     discussion:     [ObjectId],
-    conclusion:     ObjectId,
+    conclusion:     [ObjectId],
     accepted:       String
 });
 councilSchema.index({ invited: 1, updated: 1 });
@@ -125,7 +125,7 @@ councilSchema.methods.Conclusion = function(user, comment, uuid, fn) {
             private:    true
         }, function(err, sc) {});
 
-        this.accepted = s;
+        this.conclusion.push(s);
         this.updated = Date.now();
         this.save(function(err, sc) { fn && fn(!err, err || that) });
     }
@@ -157,13 +157,12 @@ exports.spawn = spawn = function(user, msg, fn) {
         private:    true
     }, function(err, ag) {});
 
-    c.agenda = agenda;
+    c.agenda.push(agenda);
     c.discussion = [];
-    c.conclusion = null;
+    c.conclusion = [];
 
     // save only if agenda was saved successfully
-    if (c.agenda) c.save(function(err, sc) { fn && fn(!err, err || sc) });
-    else fn && fn('Could not create agenda');
+    c.save(function(err, sc) { fn && fn(!err, err || sc) });
 };
 
 exports.invite  = invite = function(user, json, fn) {

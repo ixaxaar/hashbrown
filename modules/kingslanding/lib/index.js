@@ -67,7 +67,7 @@ var requestResponder = function(req, res, result, msg) {
 
     log('debug', 'sending \n' + JSON.stringify(r));
 
-    if (r.msg.isNumber()) {
+    if (_.isNumber(r.msg)) {
         res.send(r.msg);
     }
     else if (validate(r, resultConstructorValidatorSchema)) {
@@ -238,11 +238,11 @@ var timelineRequestRouter = function(req, res, next) {
     if (validate(req.body, requestValidatorSchema))
         switch(req.body.request) {
             case 'timeline':
-                timeline.timeline(req.user, respond);
+                timeline.timeline(req.user, req.body.body.slab, respond);
                 break;
 
             case 'usertimeline':
-                timeline.userTimeline(req.user, respond);
+                timeline.userTimeline(req.user, req.body.body.slab, respond);
                 break;
 
             default:

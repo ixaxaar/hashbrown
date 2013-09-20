@@ -20,13 +20,13 @@ module.exports = function () {
     // the POST routes
     app.post(/.*/, framework.checkCredentials);
 
-//    var kingslanding = require('./lib/');
-//    kingslanding(app);
+    var kingslanding = require('./lib/');
+    kingslanding(app);
 
-//    any intermediate GET routes go here
+    // any intermediate GET routes go here
 
-//    for everything else
-//    app.all("*", function(req, res) { return res.send(404); });
+    // for everything else
+    app.all("*", function(req, res) { return res.send(404); });
 
     log('info', 'kingslanding is up!');
 

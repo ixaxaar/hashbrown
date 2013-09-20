@@ -1,23 +1,26 @@
 extends layout
 block content
 
-    div.login-background
-        div.container
-            div.login-app
-                div.login-header.text-center
-                    h4#header
-                        strong HashBrown Sentinel
+  div.login-background
+    div.container
+      div.login-app
+        div.login-header.text-center
+          h4#header
+            strong Sentinel
 
-                div.login-form
-                    form.form-horizontal.form-login-app(action='/login',method='post')
-                        div.form-group
-                            label.col-lg-4.control-label(for="inputEmail") Email
-                            div.col-lg-8
-                                input#inputEmail.form-control(type="text", placeholder="john.doe@organization.com")
-                        div.form-group
-                            label.col-lg-4.control-label(for="inputPassword") Password
-                            div.col-lg-8
-                                input#inputPassword.form-control(type="password", placeholder="Password")
-                        div.form-group
-                            div.col-lg-12
-                                button#submit.btn.btn-primary.btn-block(type="submit") Sign in
+        div.login-form
+          form.form-horizontal.form-login-app(action='/login',method='post')
+            div.form-group
+              label.col-lg-4.control-label(for="inputEmail") Email
+              div.col-lg-8
+                input#inputEmail.form-control(type="text", placeholder="john.doe@organization.com")
+            div.form-group
+              label.col-lg-4.control-label(for="inputPassword") Password
+              div.col-lg-8
+                input#inputPassword.form-control(type="password", placeholder="Password")
+            div.form-group
+              div.col-lg-12
+                button#submit.btn.btn-primary.btn-block(type="submit") Sign in
+            div#login-error.invisible.form-horizontal.text-center
+              p.text-error Error logging-in, please try again.
+              p.text-error For development, use user: god and pass:123
