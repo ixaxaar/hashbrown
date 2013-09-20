@@ -1,6 +1,4 @@
-doctype 5
-html
-    head
-        title= title
-        link(rel='stylesheet', href='/stylesheets/style.css')
-    body
+extends layout
+block content
+  div.login-background
+    p Logged-in user's uuid is #{title}

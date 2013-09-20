@@ -6,7 +6,7 @@
 var mordor = require('./ODNSWIM');
 
 exports.tirith = function(req, res){
-    res.render('home', { title: 'Tirith' + req.user.uuid });
+    res.render('home', { title: req.user.uuid });
 };
 
 exports.ithil = function(req, res){

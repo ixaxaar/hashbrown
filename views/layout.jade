@@ -13,3 +13,14 @@ html(lang="en")
     body
         block content
         script(src='javascripts/jquery-2.0.3.min.js')
+        script(src='javascripts/underscore.js')
+        script(src='javascripts/backbone.js')
+        script(src='javascripts/prochondo.js')
+        script.
+          $('.form-login-app').submit(function() {
+            console.log($('#inputEmail').val());
+            console.log($('#inputPassword').val());
+            $.post('/login', { username: $('#inputEmail').val(), password: $('#inputPassword').val() },
+            function(data, textStatus, jqXHR){ $('html').load('/'); });
+            return false;
+          });

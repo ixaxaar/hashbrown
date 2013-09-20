@@ -11,6 +11,6 @@
  * GET home page.
  */
 
-exports.login = function(req, res){
+module.exports = exports = function(req, res){
     res.render('login', { title: 'Login' });
 };
