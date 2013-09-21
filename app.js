@@ -97,7 +97,7 @@ app.get('/logout', function(req, res){
     req.session.destroy(function(err) {
         console.log('Could not destroy session');
     });
-    res.redirect('/login');
+    res.redirect('/');
 });
 
 // authenticate EVERYTHING except the login page,

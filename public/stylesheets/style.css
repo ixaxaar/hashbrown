@@ -1,4 +1,5 @@
-/* Login Page Starts */
+
+/*Login page Styling*/
 
 .login-background {
     color: white;
@@ -17,4 +18,112 @@
     padding-top: 3%;
 }
 
-/* Login Page Ends */
+/*Website Styling*/
+
+/*Header*/
+
+#root-container {
+}
+
+#root-header {
+    background: #8f66bb;
+    overflow: inherit;
+    padding-left: 5%;
+    padding-right: 5%;
+    text-shadow: 0 -2px 0 rgba(0,0,0,.15);
+    border-color: #463265;
+    box-shadow: 0 2px 0 rgba(255,255,255,.1);
+}
+#root-header .navbar-brand {
+    color: #fff;
+}
+#root-header .navbar-nav > li > a {
+    color: #ffffff;
+}
+#root-header .navbar-nav > li > a:hover {
+    text-decoration: none;
+    background-color: #8f66bb;
+}
+#root-header .navbar-nav > .active > a,
+#root-header .navbar-nav > .active > a:hover {
+    color: #fff;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    background-color: #7066bb;
+}
+#root-header-logo {
+    color: #ffffff;
+    display: block;
+}
+#root-header-controls {
+    color: #ffffff;
+    display: block;
+}
+
+#logo-text {
+    text-decoration: none;
+    color: #ffffff;
+    text-shadow: 0 -2px 0 rgba(0,0,0,.15);
+    background-color: #8f66bb;
+}
+
+/*Footer*/
+
+#root-footer {
+    height: 10px;
+    padding-left: 5%;
+    padding-right: 5%;
+}
+
+#foot-navbar-ul {
+    text-decoration: none;
+    list-style: none;
+}
+
+#search-button {
+    margin-left: 10px;
+}
+
+
+/*Main page's content*/
+
+#content-root-col {
+    margin-top: 50px;
+    margin-bottom: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    padding-left: 0px;
+    margin-left: 0px;
+    text-align: center;
+    text-shadow: 0 1px 0 rgba(0,0,0,.15);
+    position: relative;
+}
+
+/*sidebar*/
+#sidebar-root-col {
+    margin-top: 70px;
+    margin-bottom: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    padding-right: 0px;
+    margin-right: 0px;
+    text-align: center;
+    text-shadow: 0 1px 0 rgba(0,0,0,.15);
+    position: static;
+    display: block;
+}
+
+.sidebar-a {
+    color: #000000;
+    text-decoration: none;
+}
+.sidebar-a:hover {
+    text-decoration: none;
+ }
+
+
+
+
+
+
+
