@@ -1442,6 +1442,8 @@ http://localhost:3000/winterfell/timeline
 Kingslanding API:
 =========
 
+Tales (feeds shared with everyone )
+
 1. Create a tale:
 http://localhost:3000/kingslanding/tale
 ```JSON
@@ -1766,6 +1768,464 @@ Response:
 }
 ```
 
+Councils, for private invite-only discussion feeds.
+
+1. Create a council:
+http://localhost:3000/kingslanding/council
+```JSON
+{
+    "request":"create",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "message": "create a new council"
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "create",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 0,
+    "org": "org1",
+    "summonerName": "u1@org1",
+    "summoner": "u1@org1",
+    "_id": "523d4f548150dc5310000014",
+    "conclusion": [],
+    "discussion": [],
+    "agenda": [
+      {
+        "type": "private",
+        "actorName": "u1@org1",
+        "actor": "u1@org1",
+        "content": "",
+        "org": "org1",
+        "_id": "523d4f548150dc5310000015",
+        "votes": [],
+        "receivers": [],
+        "teams": [],
+        "created": "2013-09-21T07:47:50.066Z",
+        "uuid": "42c57cec-83ad-4943-954d-002e94510c92"
+      }
+    ],
+    "invited": [
+      "u1@org1"
+    ],
+    "updated": "2013-09-21T07:47:50.068Z",
+    "created": "2013-09-21T07:47:50.068Z",
+    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+  }
+}
+```
+
+2. Invite a user to a council
+http://localhost:3000/kingslanding/council
+```JSON
+{
+    "request":"invite",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0",
+        "user": "u5@org1"
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "invite",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 3,
+    "_id": "523d4f548150dc5310000014",
+    "org": "org1",
+    "summoner": "u1@org1",
+    "summonerName": "u1@org1",
+    "conclusion": [],
+    "discussion": [],
+    "agenda": [
+      {
+        "uuid": "42c57cec-83ad-4943-954d-002e94510c92",
+        "created": "2013-09-21T07:47:50.066Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d4f548150dc5310000015",
+        "org": "org1",
+        "content": "",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "invited": [
+      "u1@org1",
+      "u5@org1"
+    ],
+    "updated": "2013-09-21T09:04:30.142Z",
+    "created": "2013-09-21T07:47:50.068Z",
+    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+  }
+}
+```
+
+3. Comment in a council:
+http://localhost:3000/kingslanding/council
+```JSON
+{
+    "request":"comment",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0",
+        "comment": "comment 222222222222222"
+    }
+}
+```
+Request:
+```JSON
+{
+  "request": "comment",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 5,
+    "_id": "523d4f548150dc5310000014",
+    "org": "org1",
+    "summoner": "u1@org1",
+    "summonerName": "u1@org1",
+    "conclusion": [],
+    "discussion": [
+      {
+        "type": "private",
+        "actorName": "u1@org1",
+        "actor": "u1@org1",
+        "content": "comment 222222222222222",
+        "org": "org1",
+        "_id": "523d62032e52191617000015",
+        "votes": [],
+        "receivers": [],
+        "teams": [],
+        "created": "2013-09-21T09:07:55.725Z",
+        "uuid": "9aa9cf1d-93e8-4828-941e-5842d65f62ca"
+      }
+    ],
+    "agenda": [
+      {
+        "uuid": "42c57cec-83ad-4943-954d-002e94510c92",
+        "created": "2013-09-21T07:47:50.066Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d4f548150dc5310000015",
+        "org": "org1",
+        "content": "",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "invited": [
+      "u1@org1",
+      "u5@org1"
+    ],
+    "updated": "2013-09-21T09:08:19.164Z",
+    "created": "2013-09-21T07:47:50.068Z",
+    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+  }
+}
+```
+
+4. Un-Comment:
+http://localhost:3000/kingslanding/council
+```JSON
+{
+    "request":"uncomment",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0",
+        "commentuuid": "9aa9cf1d-93e8-4828-941e-5842d65f62ca"
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "uncomment",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 6,
+    "_id": "523d4f548150dc5310000014",
+    "org": "org1",
+    "summoner": "u1@org1",
+    "summonerName": "u1@org1",
+    "conclusion": [],
+    "discussion": [],
+    "agenda": [
+      {
+        "uuid": "42c57cec-83ad-4943-954d-002e94510c92",
+        "created": "2013-09-21T07:47:50.066Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d4f548150dc5310000015",
+        "org": "org1",
+        "content": "",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "invited": [
+      "u1@org1",
+      "u1@org1",
+      "u1@org1",
+      "u5@org1"
+    ],
+    "updated": "2013-09-21T09:17:42.121Z",
+    "created": "2013-09-21T07:47:50.068Z",
+    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+  }
+}
+```
+
+5. Upvote a comment in a council:
+http://localhost:3000/kingslanding/council
+```JSON
+{
+    "request":"upvote",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0",
+        "commentuuid": "d7a0116d-18c0-4af0-b118-5718c4078de1"
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "upvote",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 8,
+    "_id": "523d4f548150dc5310000014",
+    "org": "org1",
+    "summoner": "u1@org1",
+    "summonerName": "u1@org1",
+    "conclusion": [],
+    "discussion": [
+      {
+        "uuid": "d7a0116d-18c0-4af0-b118-5718c4078de1",
+        "created": "2013-09-21T09:07:55.725Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [
+          "u1@org1"
+        ],
+        "_id": "523d61f12e52191617000014",
+        "org": "org1",
+        "content": "comment 1111111111111",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "agenda": [
+      {
+        "uuid": "42c57cec-83ad-4943-954d-002e94510c92",
+        "created": "2013-09-21T07:47:50.066Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d4f548150dc5310000015",
+        "org": "org1",
+        "content": "",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "invited": [
+      "u1@org1",
+      "u1@org1",
+      "u1@org1",
+      "u5@org1"
+    ],
+    "updated": "2013-09-21T09:37:06.528Z",
+    "created": "2013-09-21T07:47:50.068Z",
+    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+  }
+}
+```
+
+6. Downvote a comment in a council:
+http://localhost:3000/kingslanding/council
+```JSON
+{
+    "request":"downvote",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0",
+        "commentuuid": "d7a0116d-18c0-4af0-b118-5718c4078de1"
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "downvote",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 8,
+    "_id": "523d4f548150dc5310000014",
+    "org": "org1",
+    "summoner": "u1@org1",
+    "summonerName": "u1@org1",
+    "conclusion": [],
+    "discussion": [
+      {
+        "uuid": "d7a0116d-18c0-4af0-b118-5718c4078de1",
+        "created": "2013-09-21T09:07:55.725Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d61f12e52191617000014",
+        "org": "org1",
+        "content": "comment 1111111111111",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "agenda": [
+      {
+        "uuid": "42c57cec-83ad-4943-954d-002e94510c92",
+        "created": "2013-09-21T07:47:50.066Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d4f548150dc5310000015",
+        "org": "org1",
+        "content": "",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "invited": [
+      "u1@org1",
+      "u1@org1",
+      "u1@org1",
+      "u5@org1"
+    ],
+    "updated": "2013-09-21T09:37:55.780Z",
+    "created": "2013-09-21T07:47:50.068Z",
+    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+  }
+}
+```
+
+6. Final conclusion of a council and the most accepted answer:
+http://localhost:3000/kingslanding/council
+```JSON
+{
+    "request":"conclusion",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0",
+        "commentuuid": "d7a0116d-18c0-4af0-b118-5718c4078de1",
+        "conclusion": "council came to a conclusion"
+    }
+}
+```
+Response:
+```JSON
+{
+  "request": "conclusion",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 10,
+    "_id": "523d4f548150dc5310000014",
+    "org": "org1",
+    "summoner": "u1@org1",
+    "summonerName": "u1@org1",
+    "conclusion": [
+      {
+        "type": "private",
+        "actorName": "",
+        "actor": null,
+        "content": "council came to a conclusion",
+        "org": "org1",
+        "_id": "523d89f3ff6582410f000014",
+        "votes": [],
+        "receivers": [],
+        "teams": [],
+        "created": "2013-09-21T11:58:34.244Z",
+        "uuid": "a5dcf74d-2cbf-4d8f-be7c-4fad5bee52b8"
+      }
+    ],
+    "discussion": [
+      {
+        "uuid": "d7a0116d-18c0-4af0-b118-5718c4078de1",
+        "created": "2013-09-21T09:07:55.725Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d61f12e52191617000014",
+        "org": "org1",
+        "content": "comment 1111111111111",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "agenda": [
+      {
+        "uuid": "42c57cec-83ad-4943-954d-002e94510c92",
+        "created": "2013-09-21T07:47:50.066Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d4f548150dc5310000015",
+        "org": "org1",
+        "content": "",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "invited": [
+      "u1@org1",
+      "u1@org1",
+      "u1@org1",
+      "u5@org1"
+    ],
+    "updated": "2013-09-21T11:58:43.276Z",
+    "created": "2013-09-21T07:47:50.068Z",
+    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+  }
+}
+```
+
+7. Destroy a council:
+http://localhost:3000/kingslanding/council
+```JSON
+{
+    "request":"destroy",
+    "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
+    "body": {
+        "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+    }
+}
+```
+
+
 Response schema validator:
 =========
 
@@ -1780,7 +2240,58 @@ var resultConstructorValidatorSchema = {
         "success": { "type": "boolean", "required": "true" },
         "msg": { "anyOf": [
                 {
-                    "description": "object"
+                    "desc{
+  "request": "uncomment",
+  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
+  "success": true,
+  "msg": {
+    "__v": 6,
+    "_id": "523d4f548150dc5310000014",
+    "org": "org1",
+    "summoner": "u1@org1",
+    "summonerName": "u1@org1",
+    "conclusion": [],
+    "discussion": [
+      {
+        "uuid": "d7a0116d-18c0-4af0-b118-5718c4078de1",
+        "created": "2013-09-21T09:07:55.725Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d61f12e52191617000014",
+        "org": "org1",
+        "content": "comment 1111111111111",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "agenda": [
+      {
+        "uuid": "42c57cec-83ad-4943-954d-002e94510c92",
+        "created": "2013-09-21T07:47:50.066Z",
+        "teams": [],
+        "receivers": [],
+        "votes": [],
+        "_id": "523d4f548150dc5310000015",
+        "org": "org1",
+        "content": "",
+        "actor": "u1@org1",
+        "actorName": "u1@org1",
+        "type": "private"
+      }
+    ],
+    "invited": [
+      "u1@org1",
+      "u1@org1",
+      "u1@org1",
+      "u5@org1"
+    ],
+    "updated": "2013-09-21T09:17:42.121Z",
+    "created": "2013-09-21T07:47:50.068Z",
+    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
+  }
+}ription": "object"
                 },
                 {
                     "description": "string"

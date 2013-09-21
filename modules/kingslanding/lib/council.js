@@ -2,11 +2,14 @@
 var scroll = require('./scroll');
 
 var uuid = require('node-uuid');
+var _ = require('underscore');
 
 var goose = require('mongoose')
     , Schema = goose.Schema
     , ObjectId = goose.ObjectId;
 
+var framework = require('../../../framework')
+    , findUser = framework.findUserbyuid;
 
 var councilSchema = new Schema({
     uuid:           { type: String, default: uuid.v4() },
@@ -27,25 +30,30 @@ councilSchema.index({ invited: 1, updated: 1 });
 councilSchema.methods.Invite = function(user, invited, fn) {
     var that = this;
 
-    if (_.contains(this.invited, user.uid)) {
-        if (user.org === this.org) {
-            // send the guy a scroll
-            var s = new scroll({});
-            s.Create({
-                org:        this.org,
-                content:    "Invitation to discussion",
-                actor:      user.uid,
-                actorName:  user.profile[0].name || user.uid,
-                receivers:  invited
-            }, function(err, sc) {});
+    findUser(invited, function(err, invited) {
+       if (!err && invited && user.org === that.org && invited.org === that.org) {
+           if (_.contains(that.invited, user.uid)) {
+               if (!_.contains(that.invited, invited.uid)) {
+                   // send the guy a scroll
+                   var s = new scroll({});
+                   s.Create({
+                       org:        that.org,
+                       content:    "Invitation to discussion",
+                       actor:      user.uid,
+                       actorName:  user.profile[0].name || user.uid,
+                       receivers:  [invited.uid]
+                   }, function(err, sc) {});
 
-            this.invited.push(user.uid);
-            this.updated = Date.now();
-            that.save(function(err, sc) { fn && fn(!err, err || that) });
-        }
-        else fn(false, 'User not found');
-    }
-    else fn(false, 'Only invited individuals can invite');
+                   that.invited.push(invited.uid);
+                   that.updated = Date.now();
+                   that.save(function(err, sc) { fn && fn(!err, err || that) });
+               }
+               else fn(false, 'Already invited');
+           }
+           else fn(false, 'Only invited individuals can invite');
+       }
+       else fn(false, 'Could not find user');
+    });
 };
 
 councilSchema.methods.Comment = function(user, comment, fn) {
@@ -55,7 +63,7 @@ councilSchema.methods.Comment = function(user, comment, fn) {
         var s = new scroll({});
         s.Create({
             org:        this.org,
-            content:    msg,
+            content:    comment,
             actor:      user.uid,
             actorName:  user.profile[0].name || user.uid,
             private:    true
@@ -85,10 +93,10 @@ councilSchema.methods.Uncomment = function(user, uuid, fn) {
 councilSchema.methods.Upvote = function(user, uuid, fn) {
     if (_.contains(this.invited, user.uid)) {
         this.discussion.forEach(function(s) {
-            if (s.uuid === uuid) s.votes++;
+            if ((s.uuid === uuid) && !_.contains(s.votes, user.uid)) s.votes.push(user.uid);
         });
         this.updated = Date.now();
-        this.save(function(err, sc) { fn && fn(!err, err || that) });
+        this.save(function(err, sc) { fn && fn(!err, err || sc) });
     }
     else fn(false, 'Only invited individuals can upvote');
 };
@@ -96,16 +104,17 @@ councilSchema.methods.Upvote = function(user, uuid, fn) {
 councilSchema.methods.Downvote = function(user, uuid, fn) {
     if (_.contains(this.invited, user.uid)) {
         this.discussion.forEach(function(s) {
-            if (s.uuid === uuid) s.votes--;
+            if (s.uuid === uuid)
+                s.votes = _.reject(s.votes, function(v) { return v === user.uid });
         });
         this.updated = Date.now();
-        this.save(function(err, sc) { fn && fn(!err, err || that) });
+        this.save(function(err, sc) { fn && fn(!err, err || sc) });
     }
     else fn(false, 'Only invited individuals can downvote');
 };
 
 councilSchema.methods.Destroy = function(user, fn) {
-    this.remove(function(err, t) { fn(!err, err || that) });
+    this.remove(function(err, t) { fn(!err, err || t) });
 };
 
 councilSchema.methods.Conclusion = function(user, comment, uuid, fn) {
@@ -168,49 +177,49 @@ exports.spawn = spawn = function(user, msg, fn) {
 exports.invite  = invite = function(user, json, fn) {
     findCouncil({ uuid: json.uuid }, function(err, c) {
         if (!err && c) c.Invite(user, json.user, fn);
-        else fn(false, err);
+        else fn(false, err || 'Could not find');
     });
 };
 
 exports.comment  = comment = function(user, json, fn) {
     findCouncil({ uuid: json.uuid }, function(err, c) {
         if (!err && c) c.Comment(user, json.comment, fn);
-        else fn(false, err);
+        else fn(false, err || 'Could not find');
     });
 };
 
 exports.uncomment  = uncomment = function(user, json, fn) {
     findCouncil({ uuid: json.uuid }, function(err, c) {
         if (!err && c) c.Uncomment(user, json.commentuuid, fn);
-        else fn(false, err);
+        else fn(false, err || 'Could not find');
     });
 };
 
 exports.upvote  = upvote = function(user, json, fn) {
     findCouncil({ uuid: json.uuid }, function(err, c) {
         if (!err && c) c.Upvote(user, json.commentuuid, fn);
-        else fn(false, err);
+        else fn(false, err || 'Could not find');
     });
 };
 
 exports.downvote  = downvote = function(user, json, fn) {
     findCouncil({ uuid: json.uuid }, function(err, c) {
         if (!err && c) c.Downvote(user, json.commentuuid, fn);
-        else fn(false, err);
+        else fn(false, err || 'Could not find');
     });
 };
 
 exports.conclusion  = conclusion = function(user, json, fn) {
     findCouncil({ uuid: json.uuid }, function(err, c) {
-        if (!err && c) c.Conclusion(user, json.commentuuid, fn);
-        else fn(false, err);
+        if (!err && c) c.Conclusion(user, json.conclusion, json.commentuuid, fn);
+        else fn(false, err || 'Could not find');
     });
 };
 
 exports.destroy  = destroy = function(user, json, fn) {
     findCouncil({ uuid: json.uuid }, function(err, c) {
         if (!err && c) c.Destroy(user, json.conclusion, json.commentuuid, fn);
-        else fn(false, err);
+        else fn(false, err || 'Could not find');
     });
 };
 

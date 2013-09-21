@@ -93,7 +93,7 @@ var councilRequestRouter = function(req, res, next) {
         switch(req.body.request) {
             case 'create':
                 if (validate(req.body.body, newCouncilValidatorSchema)) {
-                    council.spawn(req.user, req.body.body, respond);
+                    council.spawn(req.user, req.body.body.agenda, respond);
                 }
                 else respond(false, 'Request format is wrong');
                 break;
