@@ -118,12 +118,50 @@
     text-decoration: none;
 }
 .sidebar-a:hover {
+    color: #8f66bb;
     text-decoration: none;
  }
 
+.sidebar-nested-listg {
+    max-width: 90%;
+    margin-left: 0px;
+}
+.sidebar-nested-listgi {
+    background-color: #f8f8ff;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    padding-left: 10px;
+    text-align: left;
+}
+.sidebar-nested-listgi :hover {
 
+}
+.sidebar-nested-listgi a {
+    color: #000000;
+}
+.sidebar-nested-listgi a:hover {
+    color: #8f66bb;
+    text-decoration: none;
+}
 
-
-
-
+.lgi-active {
+    background-color: #f9f9f9;
+}
+.lgi-active p {
+    /*color: #ffffff;*/
+}
+.lgi-active a {
+    /*color: #ffffff;*/
+}
+.lgi-active .sidebar-nested-listgi {
+    background-color: #f2f2f2;
+}
+.lgi-active .sidebar-nested-listgi:hover {
+    background-color: #8f77bb;
+    color: #ffffff;
+}
+.lgi-active .nlgi-active {
+    background-color: #8f77bb;
+    color: #ffffff;
+}
 
