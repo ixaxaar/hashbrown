@@ -1,0 +1,104 @@
+extends layout
+block content
+
+  div#ctrl-container
+    div.container
+      ul#ctrl-main-tabs.nav.nav-tabs.nav-justified
+        li.active
+          a#tab-profile(href='#') My Profile
+        li
+          a#tab-contacts(href='#') Contacts
+        - if (user.perm[0].admin > 8) {
+        li
+          a#tab-mgr(href='#') Manage
+        - }
+        - if (user.perm[0].admin > 8) {
+        li
+          a#tab-admin(href='#') Admin
+        - }
+        - if (user.perm[0].admin > 16) {
+        li
+          a#tab-org(href='#') Organization
+        - }
+        - if (user.perm[0].admin > 32) {
+        li
+          a#tab-god(href='#') God
+        - }
+      div#ctrl-profile
+        form.ctrl-form.form-horizontal(action='#',method='post')
+          div.form-group
+            - var fname = user.profile[0].firstName || 'none';
+            - var lname = user.profile[0].lastName || '';
+            - var mname = user.profile[0].middleName || '';
+            - var nname = user.profile[0].nickName || user.uid;
+            - var title = user.profile[0].title || 'His / Her Highness';
+            - var dob = user.profile[0].dob;
+            - var designation = user.profile[0].designation || '';
+            - var full = title+" "+fname+" \""+nname+"\" "+mname+" "+lname;
+            div.alert.alert-info
+              p Full Name: #{full}
+            div.form-group.input-group
+              span.input-group-addon Title
+              span.input-group-addon #{title}
+              input#inputTitle.form-control(type="text", placeholder='Title' ) #{fname}
+            div.form-group.input-group
+              span.input-group-addon Name
+              span.input-group-addon #{fname}
+              input#inputFirstName.form-control(type="text", placeholder='First Name' ) #{fname}
+              span.input-group-addon #{lname}
+              input#inputLastName.form-control(type="text", placeholder='Last Name' )
+            div.form-group.input-group
+              span.input-group-addon Other
+              span.input-group-addon #{mname}
+              input#inputMiddleName.form-control(type="text", placeholder='Middle Name' )
+              span.input-group-addon #{nname}
+              input#inputNickName.form-control(type="text", placeholder='Nick Name' )
+            div.form-group.input-group
+              span.input-group-addon Date of Birth
+              span.input-group-addon #{dob}
+              input#inputDOB.form-control(type="date", placeholder='DD/MM/YYYY' )
+              span.input-group-addon Private&nbsp&nbsp
+                input#inputDOBPriv(type='checkbox')
+            div.form-group.input-group
+              span.input-group-addon Designation
+              span.input-group-addon #{designation}
+              input#inputDOB.form-control(type="text", placeholder='Designation' )
+            div.form-group
+              button#profileSubmit.btn.btn-primary.btn-lg(type='submit') Update Profile
+      div#ctrl-contacts.hidden
+        form.ctrl-form.form-horizontal(action='#',method='post')
+          div.form-group
+            - var email = user.profile[0].email || '';
+            - var onum = user.profile[0].offNumber || '';
+            - var pnum = user.profile[0].perNumber || '';
+            - var address = user.profile[0].address || '';
+            div.alert.alert-info
+              - var uid = user.uid;
+              p Primary email is:&nbsp&nbsp
+                strong #{uid} &nbsp
+                | is also used as login id.
+            div.form-group.input-group
+              span.input-group-addon Email
+              span.input-group-addon #{email}
+              input#inputAddEmail.form-control(type="email", placeholder='Add additional email id' )
+            div.form-group.input-group
+              span.input-group-addon Official #
+              span.input-group-addon #{onum}
+              input#inputOffNum.form-control(type="tel", placeholder='Official Contact number' )
+            div.form-group.input-group
+              span.input-group-addon Personal #
+              span.input-group-addon #{pnum}
+              input#inputOffNum.form-control(type="tel", placeholder='Personal Contact number' )
+            div.form-group.input-group
+              span.input-group-addon Address:
+              span.input-group-addon #{address}
+              textarea#inputAddress.form-control(rows='3')
+            div.form-group
+              button#profileSubmit.btn.btn-primary.btn-lg(type='submit') Update Contacts
+      - if (user.perm[0].admin > 4)
+      div#ctrl-mgr.hidden
+        form.ctrl-form.form-horizontal(action='#',method='post')
+          div.form-group
+            label
+              p
+                h4.text-left Management area.

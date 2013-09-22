@@ -84,22 +84,8 @@
     margin-left: 10px;
 }
 
-
-/*Main page's content*/
-
-#content-root-col {
-    margin-top: 50px;
-    margin-bottom: 20px;
-    padding-top: 20px;
-    padding-bottom: 20px;
-    padding-left: 0px;
-    margin-left: 0px;
-    text-align: center;
-    text-shadow: 0 1px 0 rgba(0,0,0,.15);
-    position: relative;
-}
-
 /*sidebar*/
+
 #sidebar-root-col {
     margin-top: 70px;
     margin-bottom: 20px;
@@ -120,7 +106,13 @@
 .sidebar-a:hover {
     color: #8f66bb;
     text-decoration: none;
- }
+}
+.sidebar-a:focus {
+    color: #8f66bb;
+    text-decoration: none;
+}
+
+/*List group items*/
 
 .sidebar-nested-listg {
     max-width: 90%;
@@ -134,7 +126,6 @@
     text-align: left;
 }
 .sidebar-nested-listgi :hover {
-
 }
 .sidebar-nested-listgi a {
     color: #000000;
@@ -143,15 +134,19 @@
     color: #8f66bb;
     text-decoration: none;
 }
+.sidebar-nested-listgi a:focus {
+    color: #8f66bb;
+    text-decoration: none;
+}
 
 .lgi-active {
     background-color: #f9f9f9;
 }
 .lgi-active p {
-    /*color: #ffffff;*/
+    color: #8f66bb;
 }
 .lgi-active a {
-    /*color: #ffffff;*/
+    color: #8f66bb;
 }
 .lgi-active .sidebar-nested-listgi {
     background-color: #f2f2f2;
@@ -164,4 +159,47 @@
     background-color: #8f77bb;
     color: #ffffff;
 }
+.lgi-active .nlgi-active:focus {
+    background-color: #8f77bb;
+    color: #ffffff;
+}
+.lgi-active .nlgi-active:hover {
+    background-color: #8f77bb;
+    color: #ffffff;
+}
 
+
+/*Main page's content*/
+
+#content-root-col {
+    margin-top: 50px;
+    margin-bottom: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    padding-left: 0px;
+    margin-left: 0px;
+    text-shadow: 0 1px 0 rgba(0,0,0,.15);
+    position: relative;
+}
+
+
+/*Content root column*/
+#content-root-col {
+    margin-top: 70px;
+    margin-bottom: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    padding-right: 0px;
+    margin-right: 0px;
+    text-shadow: 0 1px 0 rgba(0,0,0,.15);
+    position: static;
+    display: block;
+}
+
+#ctrl-container {
+    width: 80%;
+    margin-left: 100px;
+}
+#ctrl-container ul {
+    margin-bottom: 50px;
+}

@@ -109,6 +109,8 @@ app.all("*", framework.mordor.openBlackGate);
 // home page - where feeds may lie...
 app.get('/', framework.minas.tirith);
 
+app.get('/controls', framework.minas.ithil);
+
 // settings page, where every user can enter here,
 // but content is tailored depending on the user
 app.get('/settings', framework.minas.ithil);
