@@ -6,12 +6,12 @@
 var mordor = require('./ODNSWIM');
 
 exports.tirith = function(req, res){
-    res.render('home', { title: 'Tirith' + req.user.uuid });
+    res.render('home', { user: req.user, title: 'Home' });
 };
 
 exports.ithil = function(req, res){
     if (req.user.uuid >= mordor.Permission.admin)
-        res.render('home', { title: 'Ithil' + req.user.uuid });
+        res.render('home', { user: req.user, title: 'Home' });
     else
-        res.render('home', { title: 'Ithil' + req.user.uuid + 'as a user' });
+        res.render('home', { user: req.user, title: 'Home' });
 };

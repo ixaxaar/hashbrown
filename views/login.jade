@@ -1,20 +1,51 @@
-extends layout
-block content
-    div.container
-        div.login-app
-            div.login-header.text-center
-                span#header Welcome HashBrown
+doctype 5
+html(lang="en")
+  head
+    meta(charset='utf-8')
+    meta(http-equiv='X-UA-Compatible', content='IE=edge')
+    title #{title} : Sentinel
+    meta(name='description', content='')
+    meta(name='viewport', content='width=device-width, initial-scale=1')
 
-            div.login-form.text-center
-                form.form-horizontal.form-login-app(action='/login',method='post')
-                    div.form-group
-                        label.col-lg-4.control-label(for="inputEmail") Email
-                        div.col-lg-8
-                            input#inputEmail.form-control(type="text", placeholder="Email")
-                    div.form-group
-                        label.col-lg-4.control-label(for="inputPassword") Password
-                        div.col-lg-8
-                            input#inputPassword.form-control(type="password", placeholder="Password")
-                    div.form-group
-                        div.col-lg-12
-                            button.btn.btn-default(type="submit") Sign in
+    link(rel='stylesheet', href='stylesheets/bootstrap.min.css')
+    link(rel='stylesheet', href='stylesheets/style.css')
+
+  body
+    div#root-container
+      div.login-background
+        div.container
+          div.login-app
+            div.login-header.text-center
+              h4#header
+                strong Sentinel
+
+            div.login-form
+              form.form-horizontal.form-login-app(action='/login',method='post')
+                div.form-group
+                  label.col-lg-4.control-label(for="inputEmail") Email
+                  div.col-lg-8
+                    input#inputEmail.form-control(type="text", placeholder="john.doe@organization.com")
+                div.form-group
+                  label.col-lg-4.control-label(for="inputPassword") Password
+                  div.col-lg-8
+                    input#inputPassword.form-control(type="password", placeholder="Password")
+                div.form-group
+                  div.col-lg-12
+                    button#submit.btn.btn-primary.btn-block(type="submit") Sign in
+                div#login-error.invisible.form-horizontal.text-center
+                  p.text-error Error logging-in, please try again.
+                  p.text-error For development, use user: god and pass:123
+
+    script(src='javascripts/jquery-2.0.3.min.js')
+    script(src='javascripts/underscore.js')
+    script.
+      $('.form-login-app').submit(function() {
+        $.post('/login', { username: $('#inputEmail').val(), password: $('#inputPassword').val() },
+          function(data, textStatus, jqXHR){
+            $('body').load('/');
+        });
+        $().ready(function() {
+          $('#login-error').removeClass('invisible');
+        })
+        return false;
+      });

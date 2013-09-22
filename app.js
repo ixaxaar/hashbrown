@@ -69,19 +69,25 @@ if (!kingdoms) {
 
 /** Routing: default routing except home goes to 404 */
 
-app.get('/login', framework.login.login);
+app.get("*", function(req, res, next) {
+    if (req.user) next();
+    else framework.login(req, res);
+});
+
+app.get("/login", function(req, res) { res.redirect('/'); });
 
 app.post('/login', function(req, res, next) {
-//    req.accepts('application/json');
+    req.accepts('application/json');
     passport.authenticate('local', function(err, user, info) {
         if (err) { return next(err) }
         if (!user) {
             console.log('error', info.message);
-            return res.redirect('/login');
+//            return res.redirect('/login');
+            return res.send(404);
         }
         req.logIn(user, function(err) {
             if (err) { return next(err); }
-            return res.redirect('/');
+            return res.send(200);
         });
     })(req, res, next);
 });
@@ -91,7 +97,7 @@ app.get('/logout', function(req, res){
     req.session.destroy(function(err) {
         console.log('Could not destroy session');
     });
-    res.redirect('/login');
+    res.redirect('/');
 });
 
 // authenticate EVERYTHING except the login page,

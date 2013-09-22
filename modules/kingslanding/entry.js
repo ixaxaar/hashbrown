@@ -1,45 +1,35 @@
 /**
  * User: Russi
  * Date: 9/7/13
- * Time: 9:16 PM
+ * Time: 9:22 PM
  */
 
+var framework = require('../../framework');
+
 var express = require('express');
+var app = express();
 
-// global variables for interaction with framework
-var app;
-// todo: auto-remove this
-var kingdom;
 
-var backend = require(process.cwd() + '/framework/realm');
-var realm = require(process.cwd() + '/framework/realm');
-var mordor = require(process.cwd() + '/framework/ODNSWIM');
-var entity = require(process.cwd() + '/framework/entity');
+var winston = require('winston');
+global.log = winston.log;
 
 //Configure this module's framework:
 //each app.get can define handlers for GET requests handled
 //by each sub-module
 module.exports = function () {
-    app = express();
-//    kingdom = new entity.Kingdom(require(process.cwd() +
-//        '/modules/kingslanding/' + 'package.json'), 2);
+    // the POST routes
+    app.post(/.*/, framework.checkCredentials);
 
-//    app.get(/.*/,function (req, res) {
-//        checkAccess(req, res, function() {
-//            var testapi = backend.getAPI('test', 'test');
-//            if (testapi) testapi('hahahahaha');
-//            res.send(req.path);
-//        });
-//    });
+    var kingslanding = require('./lib/');
+    kingslanding(app);
+
+    // any intermediate GET routes go here
+
+    // for everything else
+    app.all("*", function(req, res) { return res.send(404); });
+
+    log('info', 'kingslanding is up!');
 
     return app;
 }();
 
-
-//// An example for access control to modules
-//var checkAccess = function(req, res, fn) {
-//    if (req.isAuthenticated() &&
-//        mordor.Permission.hasPermission(req.user, kingdom, mordor.Permission.access))
-//        {return fn();}
-//    res.redirect('/login');
-//};
