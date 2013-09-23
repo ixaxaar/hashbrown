@@ -74,7 +74,6 @@ app.get('/register', function(req, res, next) {
 });
 
 app.post('/register', function(req, res) {
-    console.log(req.body);
     framework.findUserbyuid('god', function(err, g) {
         if (!err) {
             req.user = g;

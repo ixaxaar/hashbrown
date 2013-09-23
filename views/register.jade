@@ -23,6 +23,8 @@ html(lang="en")
       div#register-container.container
         div.login-form
           form.form-horizontal.text-left(action='/register',method='post', style='width: 60%; min-width: 400px; margin: auto;')
+            div.form-group
+              p.alert.alert-info Register with Sentinel Organization Manager
             div.form-group.input-group
               span.input-group-addon Organization's Name
               input#inputName.form-control(type="text", placeholder="Name")
@@ -80,11 +82,18 @@ html(lang="en")
           dbName: dbname,
           kingdoms: kingdoms
         }
+
         $.post('/register', request, function(data) {
-          if (!data.success) $('.btn-lg').removeClass('btn-primary').addClass('btn-error');
+          console.log(data);
+          if (!data.success) {
+            console.log(data);
+            $('.btn-lg').html(data.response);
+            $('.btn-lg').removeClass('btn-primary').addClass('btn-danger');
+          }
           else {
             $('.btn-lg').removeClass('btn-primary').addClass('btn-success');
             $('.btn-block').removeClass('hidden');
           }
         }, 'json');
+
       });
