@@ -25,7 +25,7 @@ var goose = require('mongoose')
     , Schema = goose.Schema
     , ObjectId = Schema.ObjectId;
 
-var mongoose = goose.createConnection('mongodb://localhost/history');
+var mongoose = goose.createConnection('mongodb://localhost/persistence');
 
 var uuid = require('node-uuid');
 var _ = require('underscore');

@@ -11,6 +11,11 @@ html(lang="en")
     link(rel='stylesheet', href='stylesheets/style.css')
 
   body
+    - user = user || {};
+    - user.profile = user.profile || [0];
+    - user.perm = user.perm || [{perm: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}];
+    - user.teams = user.teams || [{}];
+
     div.god-container
       header#root-container
         header#root-header.navbar.navbar-fixed-top

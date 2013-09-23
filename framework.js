@@ -64,3 +64,4 @@ exports.findTeam = team.findTeam;
 exports.getConnection = team.GetConnection;
 exports.forEachOrg = team.forEachOrg;
 exports.forEachTeam = team.forEachTeam;
+exports.createOrg = team.godCreatesAnOrg;
