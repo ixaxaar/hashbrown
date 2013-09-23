@@ -20,6 +20,38 @@
 
 /*Website Styling*/
 
+a {
+    color: #8f77bb;
+}
+a:hover {
+    color: #8f77bb;
+}
+a:active {
+    color: #8f77bb;
+}
+a:focus {
+    color: #8f77bb;
+}
+
+.btn-primary {
+    background-color: #8f77bb;
+    border-color: #8f77bb;
+}
+
+.alert-info {
+    background-color: #f7f7f7;
+    color: #8f77bb;
+    border-color: #8f77bb;
+}
+.alert-warning {
+    background-color: #f7f7f7;
+    border-color: #8f77bb;
+}
+.alert-error {
+    background-color: #f7f7f7;
+    border-color: #8f77bb;
+}
+
 /*Header*/
 
 #root-container {
@@ -104,11 +136,15 @@
     text-decoration: none;
 }
 .sidebar-a:hover {
-    color: #8f66bb;
+    color: #8f77bb;
     text-decoration: none;
 }
 .sidebar-a:focus {
-    color: #8f66bb;
+    color: #000000;
+    text-decoration: none;
+}
+.sidebar-a:active {
+    color: #000000;
     text-decoration: none;
 }
 
@@ -184,6 +220,7 @@
 
 
 /*Content root column*/
+
 #content-root-col {
     margin-top: 70px;
     margin-bottom: 20px;
@@ -201,5 +238,5 @@
     margin-left: 100px;
 }
 #ctrl-container ul {
-    margin-bottom: 50px;
+    margin-bottom: 20px;
 }

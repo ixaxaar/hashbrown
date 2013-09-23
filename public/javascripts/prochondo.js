@@ -35,6 +35,10 @@ $('.sidebar-nested-listgi').on('click', function(){
     $(this).addClass('nlgi-active');
 });
 
+///////////////////////////////////////
+//      Controls
+///////////////////////////////////////
+
 // Controls - Tabs
 
 $('#tab-profile').on('click', function() {
@@ -89,4 +93,45 @@ $('#tab-god').on('click', function() {
     $(this).parent().addClass('active');
     $('.ctrl-form').parent().addClass('hidden');
     $('#ctrl-god').removeClass('hidden');
+});
+
+// Profile tab
+
+$('#profileSubmit').on('click', function() {
+    return false;
+});
+
+// Manage tab
+
+$('#ctrl-mgr-agree').on('click', function() {
+    $(this).addClass('hidden');
+    $('#mgr-content').removeClass('hidden');
+    // prevent the default action
+    return false;
+});
+
+$('.mgr-tab').on('click', function() {
+    $(this).parent().siblings().removeClass('active');
+    $(this).parent().addClass('active');
+});
+$('#mgr-tab-users').on('click', function() {
+    $('.mgr-tab-content').addClass('hidden');
+    $('#mgr-tab-users-content').removeClass('hidden');
+});
+$('#mgr-tab-new-user').on('click', function() {
+    $('.mgr-tab-content').addClass('hidden');
+    $('#mgr-tab-new-user-content').removeClass('hidden');
+});
+$('#mgr-tab-teams').on('click', function() {
+    $('.mgr-tab-content').addClass('hidden');
+    $('#mgr-tab-teams-content').removeClass('hidden');
+});
+$('#mgr-tab-new-team').on('click', function() {
+    $('.mgr-tab-content').addClass('hidden');
+    $('#mgr-tab-new-team-content').removeClass('hidden');
+});
+
+// new user form
+$('#newUserSubmit').on('click', function() {
+    return false;
 });
