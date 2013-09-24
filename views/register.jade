@@ -1,0 +1,99 @@
+doctype 5
+html(lang="en")
+  head
+    meta(charset='utf-8')
+    meta(http-equiv='X-UA-Compatible', content='IE=edge')
+    title #{title} : Sentinel
+    meta(name='description', content='')
+    meta(name='viewport', content='width=device-width, initial-scale=1')
+
+    link(rel='stylesheet', href='stylesheets/bootstrap.min.css')
+    link(rel='stylesheet', href='stylesheets/style.css')
+
+  body
+    div.god-container
+      header#root-container
+        header#root-header.navbar.navbar-fixed-top
+          div.container
+            div.navbar-header
+              h3
+                a#logo-text.text-left(href='/') Sentinel
+
+    div#root-container.container.text-center(style='margin-top: 70px;')
+      div#register-container.container
+        div.login-form
+          form.form-horizontal.text-left(action='/register',method='post', style='width: 60%; min-width: 400px; margin: auto;')
+            div.form-group
+              p.alert.alert-info Register with Sentinel Organization Manager
+            div.form-group.input-group
+              span.input-group-addon Organization's Name
+              input#inputName.form-control(type="text", placeholder="Name")
+            div.form-group.input-group
+              span.input-group-addon Password
+              input#inputPassword.form-control(type="password", placeholder="Password")
+            div.form-group.input-group
+              span.input-group-addon MongoDB server connection (optional)
+              input#inputDBConn.form-control(type="text", placeholder="mongodb://", value='mongodb://')
+            div.form-group.input-group
+              span.input-group-addon MongoDB database name (optional)
+              input#inputDBName.form-control(type="text", placeholder='DB name')
+            div.form-group.input-group.btn.btn-default
+              span.input-group-addon Services to subscribe :
+              span.input-group-addon Feeds&nbsp&nbsp
+                input#inputKings(type='checkbox')
+              span.input-group-addon Document Management&nbsp&nbsp
+                input#inputWfell(type='checkbox')
+              span.input-group-addon Project Management&nbsp&nbsp
+                input#inputCRock(type='checkbox')
+            div(style='padding-top: 40px;')
+            div.form-group
+              a.btn.btn-primary.btn-lg(href='#') Register Me!
+            div(style='padding-top: 40px;')
+            a.btn.btn-primary.btn-block.hidden(href='/') Take me home!
+
+    script(src='javascripts/jquery-2.0.3.min.js')
+    script.
+      $('.btn-lg').one('click', function() {
+        $(this).html('Registering...');
+
+        // there has to be some validation of the mongodb connection string!!
+        var name = $('#inputName').val();
+        var pwd = $('#inputPassword').val();
+        var dbconn = $('#inputDBConn').val() || null;
+        var dbname = $('#inputDBName').val() || null;
+        var kings = !!$('#inputKings').val() ? 'kingslanding' : null;
+        var wfell = !!$('#inputWfell').val() ? 'winterfell' : null;
+        //var crock = !!$('#inputCRock').val() ? 'casterlyrock' : null;
+
+        var kingdoms = [];
+        if (kings) kingdoms.push(kings);
+        if (wfell) kingdoms.push(wfell);
+        //if (crock) kingdoms.push(crock);
+
+        if (!dbconn || !dbname) {
+          dbconn = null;
+          dbname = null;
+        }
+
+        var request = {
+          name: name,
+          hash: pwd,
+          dbConnection: dbconn,
+          dbName: dbname,
+          kingdoms: kingdoms
+        }
+
+        $.post('/register', request, function(data) {
+          console.log(data);
+          if (!data.success) {
+            console.log(data);
+            $('.btn-lg').html(data.response);
+            $('.btn-lg').removeClass('btn-primary').addClass('btn-danger');
+          }
+          else {
+            $('.btn-lg').removeClass('btn-primary').addClass('btn-success');
+            $('.btn-block').removeClass('hidden');
+          }
+        }, 'json');
+
+      });

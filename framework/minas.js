@@ -1,6 +1,6 @@
 
 /*
- * GET home page.
+ * GET pages.
  */
 
 var mordor = require('./ODNSWIM');
@@ -10,8 +10,9 @@ exports.tirith = function(req, res){
 };
 
 exports.ithil = function(req, res){
-    if (req.user.uuid >= mordor.Permission.admin)
-        res.render('home', { user: req.user, title: 'Home' });
-    else
-        res.render('home', { user: req.user, title: 'Home' });
+    res.render('controls', { user: req.user, title: 'Controls' });
+};
+
+exports.arnor = function(req, res) {
+    res.render('me', { user: req.user, title: 'Me' });
 };

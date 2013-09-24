@@ -4,7 +4,7 @@ var goose = require('mongoose')
     , ObjectId = Schema.ObjectId;
 
 // the local database storing organization schemas
-var settingsdb = 'mongodb://localhost/teams';
+var settingsdb = 'mongodb://localhost/persistence';
 var mongoose = goose.createConnection(settingsdb);
 
 
@@ -271,6 +271,7 @@ OrganizationSchema.methods.createOrg = function(user, name, dbConnection, dbName
     if (validate(user, userValidationSchema)) {
         Organization.findOne( {name: name}, function(err, org) {
             if (!org) {
+                console.log(name)
                 var ret = null;
                 (name) ? that.name = name : ret = 'name missing';
                 (user) ? that.owner = name : ret = 'user is missing';
@@ -623,6 +624,8 @@ var godCreatesAnOrg = function(user, json, fn) {
     if (validate(json, godCreatesAnOrgSchema)) {
         if (user.uid === 'god') {
             var org = new Organization();
+            json.dbConnection = json.dbConnection || 'mongodb://localhost';
+            json.dbName = json.dbName || 'persistence';
 
             // create an organization an user and bind the user to that organization
             org.createOrg(user, json.name, json.dbConnection, json.dbName, function(err, newo) {
@@ -630,10 +633,7 @@ var godCreatesAnOrg = function(user, json, fn) {
                     entity.addOrgUser(user, json.name, newo.name,
                         json.hash, json.kingdoms, function(err, newu) {
                         if (!err && newu) {
-                            var response = {
-                                "useruid" : newu.uid
-                            };
-                            fn(true, response);
+                            fn(true, newu);
                         }
                         else fn(false, err);
                     });

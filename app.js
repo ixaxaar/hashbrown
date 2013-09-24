@@ -69,6 +69,22 @@ if (!kingdoms) {
 
 /** Routing: default routing except home goes to 404 */
 
+app.get('/register', function(req, res, next) {
+    res.render('register');
+});
+
+app.post('/register', function(req, res) {
+    framework.findUserbyuid('god', function(err, g) {
+        if (!err) {
+            req.user = g;
+            framework.createOrg(g, req.body, function(success, response) {
+                res.send({ success: success, response: response });
+            });
+        }
+        else req.send(500);
+    });
+});
+
 app.get("*", function(req, res, next) {
     if (req.user) next();
     else framework.login(req, res);
@@ -108,6 +124,8 @@ app.all("*", framework.mordor.openBlackGate);
 
 // home page - where feeds may lie...
 app.get('/', framework.minas.tirith);
+
+app.get('/controls', framework.minas.ithil);
 
 // settings page, where every user can enter here,
 // but content is tailored depending on the user
