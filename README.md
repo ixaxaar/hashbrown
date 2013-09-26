@@ -239,7 +239,7 @@ http://localhost:3000/team
 {
     request: "adduser"
     uuid: "038b0083-0d58-48a9-b1b2-3d2971e68947"
-    success: false
+    success: true
     msg: {
         useruid: [4]
         0:  "u2@org1"
@@ -952,11 +952,10 @@ Response: Same as 6.
 http://localhost:3000/winterfell/feed
 ```JSON
 {
-    "request":"rejectpull",
+    "request":"getuserhistory",
     "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
     "body": {
-            "historyId": "/org1/u1@org1/document",
-            "number": 0
+            "historyId": "/org1/u1@org1/document"
     }
 }
 ```
@@ -1252,8 +1251,8 @@ http://localhost:3000/winterfell/feed
     "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
     "body": {
             "uuid" : "958255dd-e53c-420a-a073-bf8982189b6d",
-                "content": "child feed 2",
-                "mentions": ["god"]
+            "content": "child feed 2",
+            "mentions": ["god"]
     }
 }
 ```
@@ -1359,7 +1358,7 @@ http://localhost:3000/winterfell/feed
     "uuid":"038b0083-0d58-48a9-b1b2-3d2971e68947",
     "body": {
             "uuid" : "958255dd-e53c-420a-a073-bf8982189b6d",
-                "childuuid": "25d743d0-f77c-4689-b9b9-a8a6993074b8"
+            "childuuid": "25d743d0-f77c-4689-b9b9-a8a6993074b8"
     }
 }
 ```
@@ -2240,58 +2239,7 @@ var resultConstructorValidatorSchema = {
         "success": { "type": "boolean", "required": "true" },
         "msg": { "anyOf": [
                 {
-                    "desc{
-  "request": "uncomment",
-  "uuid": "038b0083-0d58-48a9-b1b2-3d2971e68947",
-  "success": true,
-  "msg": {
-    "__v": 6,
-    "_id": "523d4f548150dc5310000014",
-    "org": "org1",
-    "summoner": "u1@org1",
-    "summonerName": "u1@org1",
-    "conclusion": [],
-    "discussion": [
-      {
-        "uuid": "d7a0116d-18c0-4af0-b118-5718c4078de1",
-        "created": "2013-09-21T09:07:55.725Z",
-        "teams": [],
-        "receivers": [],
-        "votes": [],
-        "_id": "523d61f12e52191617000014",
-        "org": "org1",
-        "content": "comment 1111111111111",
-        "actor": "u1@org1",
-        "actorName": "u1@org1",
-        "type": "private"
-      }
-    ],
-    "agenda": [
-      {
-        "uuid": "42c57cec-83ad-4943-954d-002e94510c92",
-        "created": "2013-09-21T07:47:50.066Z",
-        "teams": [],
-        "receivers": [],
-        "votes": [],
-        "_id": "523d4f548150dc5310000015",
-        "org": "org1",
-        "content": "",
-        "actor": "u1@org1",
-        "actorName": "u1@org1",
-        "type": "private"
-      }
-    ],
-    "invited": [
-      "u1@org1",
-      "u1@org1",
-      "u1@org1",
-      "u5@org1"
-    ],
-    "updated": "2013-09-21T09:17:42.121Z",
-    "created": "2013-09-21T07:47:50.068Z",
-    "uuid": "eeb7ba97-0e9b-4dbc-a341-106ae78709e0"
-  }
-}ription": "object"
+                    "description": "object"
                 },
                 {
                     "description": "string"
