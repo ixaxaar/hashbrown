@@ -46,6 +46,11 @@ app.configure('development', function(){
     app.use(express.favicon());
     app.use(express.logger('dev'));
     app.use(express.bodyParser());
+    app.use(function(req, res, next) {
+        log('debug', req.body);
+        if (req.body.body) req.body.body = JSON.parse(req.body.body);
+        next();
+    });
     app.use(express.methodOverride());
     framework.mordor.BlackGate(app, express, passport);
     app.use(express.static(path.join(__dirname, 'public')));

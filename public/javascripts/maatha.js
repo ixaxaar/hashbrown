@@ -17,7 +17,7 @@
 //          Models: REST APIs request-response
 ///////////////////////////////////////////////////
 
-    Sentry.models.response = Backbone.Models.extend({
+    Sentry.models.response = Backbone.Model.extend({
         defaults: {
             request: '',
             uuid: Sentry.uuid(),
@@ -47,7 +47,7 @@
         }
     });
 
-    Sentry.models.request = Backbone.Models.extend({
+    Sentry.models.request = Backbone.Model.extend({
         defaults: {
             request: '',
             uuid: Sentry.uuid(),
@@ -61,16 +61,11 @@
                 );
         },
 
-        send: function(url, body, callback) {
-            this.set('body', body.toJSON());
-            this.url = url;
-            this.listen(callback);
-            this.save();
+        listen: function(callback) {
+            Sentry.events.on(this.get('uuid'), callback);
         },
 
-        listen: function(callback) {
-            Sentry.events.on(this.model.get('uuid'), callback);
-        }
+        url: '/'
     });
 
 ///////////////////////////////////////////////////
@@ -78,21 +73,19 @@
 ///////////////////////////////////////////////////
 
     // login   
-    Sentry.models.login = Backbone.Models.extend({
+    Sentry.models.login = Backbone.Model.extend({
         defaults: {
-            username: 'none',
-            password: 'none'
+            username: 'lavender',
+            password: '123'
         },
 
         validate: function(m) {
-            return (($.strip(m.username) === m.username != null) && 
-            ($.strip(m.password) === m.password != null))
+//            return (($.strip(m.username) === m.username != null) &&
+//            ($.strip(m.password) === m.password != null))
         },
 
-        send: function(callback) {
-            var req = new Sentry.models.request();
-            req.set('request', 'login');
-            req.send(this.url, this.model.toJSON(), callback);
+        send: function() {
+            this.save();
         },
 
         url: '/login',
@@ -104,11 +97,11 @@
 ///////////////////////////////////////////////////
 
     // createorg   
-    Sentry.models.createorg = Backbone.Models.extend({
+    Sentry.models.createorg = Backbone.Model.extend({
         defaults: {
             name: "",
-            dbConnection: null,
-            dbName: null,
+            dbConnection: "",
+            dbName: "",
             hash: "",
             kingdoms: ["kingslanding"]
         },
@@ -119,14 +112,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/user',
         request: 'createorg'
     });
 
-    Sentry.models.createUser = Backbone.Models.extend({
+    Sentry.models.createUser = Backbone.Model.extend({
         defaults: {
             username: "",
             password: ""
@@ -138,14 +137,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/users',
         request: 'add'
     });
 
-    Sentry.models.promoteUser = Backbone.Models.extend({
+    Sentry.models.promoteUser = Backbone.Model.extend({
         defaults: {
             username: "",
             permission: ""
@@ -157,14 +162,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/users',
         request: 'promote'
     });
 
-    Sentry.models.grantUser = Backbone.Models.extend({
+    Sentry.models.grantUser = Backbone.Model.extend({
         defaults: {
             username: "",
             permission: "",
@@ -177,14 +188,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/users',
         request: 'grant'
     });
 
-    Sentry.models.revokeUser = Backbone.Models.extend({
+    Sentry.models.revokeUser = Backbone.Model.extend({
         defaults: {
             username: "",
             permission: "",
@@ -197,14 +214,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/users',
         request: 'revoke'
     });
 
-    Sentry.models.reassociateUser = Backbone.Models.extend({
+    Sentry.models.reassociateUser = Backbone.Model.extend({
         defaults: {
             username: "",
             newParent: ""
@@ -216,14 +239,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/users',
         request: 'reassociate'
     });
 
-    Sentry.models.deleteUser = Backbone.Models.extend({
+    Sentry.models.deleteUser = Backbone.Model.extend({
         defaults: {
             username: ""
         },
@@ -234,7 +263,13 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/users',
@@ -245,7 +280,7 @@
 //          Models: REST APIs - Team
 ///////////////////////////////////////////////////
 
-    Sentry.models.createTeam = Backbone.Models.extend({
+    Sentry.models.createTeam = Backbone.Model.extend({
         defaults: {
             parent: "",
             name: "",
@@ -259,14 +294,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/user',
         request: 'addteam'
     });
 
-    Sentry.models.addUserToTeam = Backbone.Models.extend({
+    Sentry.models.addUserToTeam = Backbone.Model.extend({
         defaults: {
             name: "",
             team: ""
@@ -278,14 +319,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/team',
         request: 'adduser'
     });
 
-    Sentry.models.changeTeamOwner = Backbone.Models.extend({
+    Sentry.models.changeTeamOwner = Backbone.Model.extend({
         defaults: {
             name: "",
             team: ""
@@ -297,14 +344,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/team',
         request: 'changeowner'
     });
 
-    Sentry.models.getTeamMembers = Backbone.Models.extend({
+    Sentry.models.getTeamMembers = Backbone.Model.extend({
         defaults: {
             team: ""
         },
@@ -315,7 +368,13 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/team',
@@ -328,7 +387,7 @@
 
     Sentry.models.Winterfell = {};
 
-    Sentry.models.Winterfell.newFeed = Backbone.Models.extend({
+    Sentry.models.Winterfell.newFeed = Backbone.Model.extend({
         defaults: {
             content: "",
             file: "",
@@ -350,14 +409,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'getallusers'
     });
 
-    Sentry.models.Winterfell.checkinFeed = Backbone.Models.extend({
+    Sentry.models.Winterfell.checkinFeed = Backbone.Model.extend({
         defaults: {
             content: "",
             file: "",
@@ -380,14 +445,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'checkinfeed'
     });
 
-    Sentry.models.Winterfell.checkoutFeed = Backbone.Models.extend({
+    Sentry.models.Winterfell.checkoutFeed = Backbone.Model.extend({
         defaults: {
             historyId: ""
         },
@@ -398,14 +469,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'checkoutfeed'
     });
 
-    Sentry.models.Winterfell.getLatestFeed = Backbone.Models.extend({
+    Sentry.models.Winterfell.getLatestFeed = Backbone.Model.extend({
         defaults: {
             historyId: ""
         },
@@ -416,14 +493,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'getlatest'
     });
 
-    Sentry.models.Winterfell.pullRequest = Backbone.Models.extend({
+    Sentry.models.Winterfell.pullRequest = Backbone.Model.extend({
         defaults: {
             historyId: ""
         },
@@ -434,14 +517,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'pullrequest'
     });
 
-    Sentry.models.Winterfell.acceptPull = Backbone.Models.extend({
+    Sentry.models.Winterfell.acceptPull = Backbone.Model.extend({
         defaults: {
             historyId: "",
             number: ""
@@ -453,14 +542,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'acceptpull'
     });
 
-    Sentry.models.Winterfell.rejectPull = Backbone.Models.extend({
+    Sentry.models.Winterfell.rejectPull = Backbone.Model.extend({
         defaults: {
             historyId: "",
             number: ""
@@ -472,14 +567,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'rejectpull'
     });
 
-    Sentry.models.Winterfell.rejectPull = Backbone.Models.extend({
+    Sentry.models.Winterfell.rejectPull = Backbone.Model.extend({
         defaults: {
             historyId: "",
             number: ""
@@ -491,14 +592,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'rejectpull'
     });
 
-    Sentry.models.Winterfell.getUserHistory = Backbone.Models.extend({
+    Sentry.models.Winterfell.getUserHistory = Backbone.Model.extend({
         defaults: {
             historyId: ""
         },
@@ -509,14 +616,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'getuserhistory'
     });
 
-    Sentry.models.Winterfell.getFullHistory = Backbone.Models.extend({
+    Sentry.models.Winterfell.getFullHistory = Backbone.Model.extend({
         defaults: {
             historyId: ""
         },
@@ -527,14 +640,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'getfullhistory'
     });
 
-    Sentry.models.Winterfell.deleteFeed = Backbone.Models.extend({
+    Sentry.models.Winterfell.deleteFeed = Backbone.Model.extend({
         defaults: {
             uuid: ""
         },
@@ -545,14 +664,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'deletefeed'
     });
 
-    Sentry.models.Winterfell.newChildFeed = Backbone.Models.extend({
+    Sentry.models.Winterfell.newChildFeed = Backbone.Model.extend({
         defaults: {
             uuid: "",
             content: "",
@@ -565,14 +690,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'newchildfeed'
     });
 
-    Sentry.models.Winterfell.deleteChildFeed = Backbone.Models.extend({
+    Sentry.models.Winterfell.deleteChildFeed = Backbone.Model.extend({
         defaults: {
             uuid: "",
             childuuid: ""
@@ -584,14 +715,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/feed',
         request: 'deletechildfeed'
     });
 
-    Sentry.models.Winterfell.userTimeline = Backbone.Models.extend({
+    Sentry.models.Winterfell.userTimeline = Backbone.Model.extend({
         defaults: {
             slab: 0
         },
@@ -602,14 +739,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/timeline',
         request: 'usertimeline'
     });
 
-    Sentry.models.Winterfell.teamTimeline = Backbone.Models.extend({
+    Sentry.models.Winterfell.teamTimeline = Backbone.Model.extend({
         defaults: {
             slab: 0,
             team: ""
@@ -621,14 +764,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/timeline',
         request: 'teamtimeline'
     });
 
-    Sentry.models.Winterfell.broadcastTimeline = Backbone.Models.extend({
+    Sentry.models.Winterfell.broadcastTimeline = Backbone.Model.extend({
         defaults: {
             slab: 0
         },
@@ -639,14 +788,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/timeline',
         request: 'broadcasttimeline'
     });
 
-    Sentry.models.Winterfell.tagTimeline = Backbone.Models.extend({
+    Sentry.models.Winterfell.tagTimeline = Backbone.Model.extend({
         defaults: {
             slab: 0,
             tags: []
@@ -658,14 +813,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/timeline',
         request: 'tagtimeline'
     });
 
-    Sentry.models.Winterfell.listDocs = Backbone.Models.extend({
+    Sentry.models.Winterfell.listDocs = Backbone.Model.extend({
         defaults: {
         },
 
@@ -675,14 +836,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/timeline',
         request: 'listdocs'
     });
 
-    Sentry.models.Winterfell.searchDocs = Backbone.Models.extend({
+    Sentry.models.Winterfell.searchDocs = Backbone.Model.extend({
         defaults: {
             slab: 0,
             query: ""
@@ -694,7 +861,13 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: '/winterfell/timeline',
@@ -705,9 +878,9 @@
 //          Models: REST APIs - Kingslanding
 ///////////////////////////////////////////////////
 
-    Sentry.Models.Kingslanding = {};
+    Sentry.models.Kingslanding = {};
 
-    Sentry.models.Kingslanding.createTale = Backbone.Models.extend({
+    Sentry.models.Kingslanding.createTale = Backbone.Model.extend({
         defaults: {
             tale: ""
         },
@@ -718,14 +891,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/tale',
         request: 'create'
     });
 
-    Sentry.models.Kingslanding.destroyTale = Backbone.Models.extend({
+    Sentry.models.Kingslanding.destroyTale = Backbone.Model.extend({
         defaults: {
             uuid: ""
         },
@@ -736,14 +915,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/tale',
         request: 'destroy'
     });
 
-    Sentry.models.Kingslanding.sayTale = Backbone.Models.extend({
+    Sentry.models.Kingslanding.sayTale = Backbone.Model.extend({
         defaults: {
             uuid: "",
             saying: ""
@@ -755,14 +940,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/tale',
         request: 'say'
     });
 
-    Sentry.models.Kingslanding.unsayTale = Backbone.Models.extend({
+    Sentry.models.Kingslanding.unsayTale = Backbone.Model.extend({
         defaults: {
             uuid: "",
             sayinguuid: ""
@@ -774,14 +965,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/tale',
         request: 'unsay'
     });
 
-    Sentry.models.Kingslanding.cheerTale = Backbone.Models.extend({
+    Sentry.models.Kingslanding.cheerTale = Backbone.Model.extend({
         defaults: {
             uuid: "",
             sayinguuid: ""
@@ -793,14 +990,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/tale',
         request: 'cheer'
     });
 
-    Sentry.models.Kingslanding.uncheerTale = Backbone.Models.extend({
+    Sentry.models.Kingslanding.uncheerTale = Backbone.Model.extend({
         defaults: {
             uuid: "",
             sayinguuid: ""
@@ -812,14 +1015,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/tale',
         request: 'uncheer'
     });
 
-    Sentry.models.Kingslanding.createCouncil = Backbone.Models.extend({
+    Sentry.models.Kingslanding.createCouncil = Backbone.Model.extend({
         defaults: {
             message: ""
         },
@@ -830,14 +1039,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/council',
         request: 'create'
     });
 
-    Sentry.models.Kingslanding.inviteToCouncil = Backbone.Models.extend({
+    Sentry.models.Kingslanding.inviteToCouncil = Backbone.Model.extend({
         defaults: {
             uuid: "",
             user: ""
@@ -849,14 +1064,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/council',
         request: 'invite'
     });
 
-    Sentry.models.Kingslanding.commentOnCouncil = Backbone.Models.extend({
+    Sentry.models.Kingslanding.commentOnCouncil = Backbone.Model.extend({
         defaults: {
             uuid: "",
             comment: ""
@@ -868,14 +1089,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/council',
         request: 'comment'
     });
 
-    Sentry.models.Kingslanding.uncommentOnCouncil = Backbone.Models.extend({
+    Sentry.models.Kingslanding.uncommentOnCouncil = Backbone.Model.extend({
         defaults: {
             uuid: "",
             commentuuid: ""
@@ -887,14 +1114,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/council',
         request: 'uncomment'
     });
 
-    Sentry.models.Kingslanding.upvoteCouncil = Backbone.Models.extend({
+    Sentry.models.Kingslanding.upvoteCouncil = Backbone.Model.extend({
         defaults: {
             uuid: "",
             commentuuid: ""
@@ -906,14 +1139,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/council',
         request: 'upvote'
     });
 
-    Sentry.models.Kingslanding.downvoteCouncil = Backbone.Models.extend({
+    Sentry.models.Kingslanding.downvoteCouncil = Backbone.Model.extend({
         defaults: {
             uuid: "",
             commentuuid: ""
@@ -925,14 +1164,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/council',
         request: 'downvote'
     });
 
-    Sentry.models.Kingslanding.conclusionCouncil = Backbone.Models.extend({
+    Sentry.models.Kingslanding.conclusionCouncil = Backbone.Model.extend({
         defaults: {
             uuid: "",
             commentuuid: "",
@@ -945,14 +1190,20 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/council',
         request: 'conclusion'
     });
 
-    Sentry.models.Kingslanding.destroyCouncil = Backbone.Models.extend({
+    Sentry.models.Kingslanding.destroyCouncil = Backbone.Model.extend({
         defaults: {
             uuid: ""
         },
@@ -963,7 +1214,13 @@
         send: function(callback) {
             var req = new Sentry.models.request();
             req.set('request', this.request);
-            req.send(this.url, this.model.toJSON(), callback);
+            req.set('body', JSON.stringify(this.toJSON()));
+            req.url = this.url;
+            req.listen(callback);
+            var promise = req.save();
+            $.when(promise).then(function() {
+                console.log(promise.responseText);
+            });
         },
 
         url: 'kingslanding/council',
