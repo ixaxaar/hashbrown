@@ -1,5 +1,5 @@
 
-(function() {
+//(function() {
     
     var Sentry = {};
 
@@ -15,14 +15,16 @@
 
 ///////////////////////////////////////////////////
 //          Models: REST APIs request-response
-///////////////////////////////////////////////////
+///////////////////////////////////////////////////1
+
+    var cb = function(data) { console.log(data) };
 
     Sentry.models.response = Backbone.Model.extend({
         defaults: {
             request: '',
-            uuid: Sentry.uuid(),
+            uuid: "",
             success: false,
-            body: {}
+            msg: {}
         },
 
         validate: function(m) {
@@ -33,8 +35,9 @@
                 );
         },
 
-        trigger: function(m) {
-            if (this.isValid) Sentry.events.trigger('m.uuid', this.model.toJSON());
+        notifyresponse: function() {
+            console.log(this.get('uuid').toString());
+            Sentry.events.trigger(this.get('uuid').toString(), this.toJSON());
         },
 
         error: function(m) {
@@ -61,8 +64,23 @@
                 );
         },
 
+        send: function(req, body, url, callback) {
+            var that = this;
+            this.set('request', req);
+            this.set('body', body);
+            this.url = url;
+            this.listen(callback);
+            var promise = this.save();
+            $.when(promise).then(function() {
+                var response = new Sentry.models.response();
+                response.set(JSON.parse(promise.responseText));
+                response.notifyresponse();
+            });
+        },
+
         listen: function(callback) {
-            Sentry.events.on(this.get('uuid'), callback);
+            console.log(this.get('uuid').toString());
+            Sentry.events.once(this.get('uuid').toString(), callback, this);
         },
 
         url: '/'
@@ -111,14 +129,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/user',
@@ -135,15 +146,9 @@
         },
 
         send: function(callback) {
+            var that = this;
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, cb);
         },
 
         url: '/users',
@@ -161,14 +166,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/users',
@@ -187,14 +185,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/users',
@@ -213,14 +204,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/users',
@@ -238,14 +222,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/users',
@@ -262,14 +239,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/users',
@@ -293,14 +263,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/user',
@@ -318,14 +281,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/team',
@@ -343,14 +299,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/team',
@@ -367,14 +316,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/team',
@@ -408,14 +350,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -444,14 +379,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -468,14 +396,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -492,14 +413,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -516,14 +430,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -541,14 +448,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -566,14 +466,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -591,14 +484,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -615,14 +501,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -639,14 +518,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -663,14 +535,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -689,14 +554,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -714,14 +572,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/feed',
@@ -738,14 +589,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/timeline',
@@ -763,14 +607,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/timeline',
@@ -787,14 +624,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/timeline',
@@ -812,14 +642,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/timeline',
@@ -835,14 +658,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/timeline',
@@ -860,14 +676,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: '/winterfell/timeline',
@@ -890,14 +699,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/tale',
@@ -914,14 +716,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/tale',
@@ -939,14 +734,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/tale',
@@ -964,14 +752,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/tale',
@@ -989,14 +770,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/tale',
@@ -1014,14 +788,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/tale',
@@ -1038,14 +805,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/council',
@@ -1063,14 +823,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/council',
@@ -1088,14 +841,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/council',
@@ -1113,14 +859,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/council',
@@ -1138,14 +877,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/council',
@@ -1163,14 +895,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/council',
@@ -1189,14 +914,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/council',
@@ -1213,14 +931,7 @@
 
         send: function(callback) {
             var req = new Sentry.models.request();
-            req.set('request', this.request);
-            req.set('body', JSON.stringify(this.toJSON()));
-            req.url = this.url;
-            req.listen(callback);
-            var promise = req.save();
-            $.when(promise).then(function() {
-                console.log(promise.responseText);
-            });
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
         },
 
         url: 'kingslanding/council',
@@ -1228,5 +939,5 @@
     });
 
 
-})();
+//})();
 
