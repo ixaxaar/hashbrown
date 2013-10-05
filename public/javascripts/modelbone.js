@@ -1,7 +1,7 @@
 
-//(function() {
+(function() {
     
-    var Sentry = {};
+    window.Sentry = {};
 
     // ze namespace
     Sentry.models = {};
@@ -10,6 +10,7 @@
     Sentry.template = {};
     Sentry.events = _.extend({}, Backbone.Events);
     Sentry.router = {};
+    // do we need require.js?
     Sentry.uuid = uuid.v4;
 
 
@@ -36,8 +37,7 @@
         },
 
         notifyresponse: function() {
-            console.log(this.get('uuid').toString());
-            Sentry.events.trigger(this.get('uuid').toString(), this.toJSON());
+            Sentry.events.trigger(this.get('uuid').toString(), this.toJSON(), this);
         },
 
         error: function(m) {
@@ -153,6 +153,30 @@
 
         url: '/users',
         request: 'add'
+    });
+
+    Sentry.models.modifyProfile = Backbone.Model.extend({
+        defaults: {
+            title: "",
+            fname: "",
+            lname: "",
+            mname: "",
+            nname: "",
+            dob: "",
+            dobpriv: "",
+            designation: ""
+        },
+
+        validate: function(m) {
+        },
+
+        send: function(callback) {
+            var req = new Sentry.models.request();
+            req.send(this.request, JSON.stringify(this.toJSON()), this.url, callback);
+        },
+
+        url: '/users',
+        request: 'modifyprofile'
     });
 
     Sentry.models.promoteUser = Backbone.Model.extend({
@@ -939,5 +963,4 @@
     });
 
 
-//})();
-
+})();

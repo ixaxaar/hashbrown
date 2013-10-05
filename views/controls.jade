@@ -27,7 +27,7 @@ block content
 
 
       div#ctrl-profile
-        form.ctrl-form.form-horizontal(action='#',method='post')
+        form.ctrl-form.form-horizontal(action='#',method='post', enctype="multipart/form-data")
           div.form-group
             - var fname = user.profile[0].firstName || 'none';
             - var lname = user.profile[0].lastName || '';
@@ -71,7 +71,7 @@ block content
                 div.form-group.input-group
                   span.input-group-addon Designation
                   span.input-group-addon #{designation}
-                  input#inputDOB.form-control(type="text", placeholder='Designation' )
+                  input#inputDesignation.form-control(type="text", placeholder='Designation' )
                 div.form-group
                   button#profileSubmit.btn.btn-primary.btn-lg(type='submit') Update Profile
 

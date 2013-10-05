@@ -16,6 +16,7 @@ var express = require('express')
     , winston = require('winston')
     , initframework = require('./framework/');
 
+
 // configure logging
 //noinspection BadExpressionStatementJS
 require('winston-syslog').Syslog;
@@ -25,12 +26,29 @@ winston.setLevels(winston.config.syslog.levels);
 // these logging methods are available throughout the app
 global.log = winston.log;
 
+var sslEnabled = false;
 
 log('info', 'Hashbrown, starting up...');
 
 var app = express();
 // for tobi testing
 module.exports = app;
+
+// Setup the CDN options
+var cdnoptions = {
+      publicDir  : path.join(__dirname, 'public')
+    , viewsDir   : path.join(__dirname, 'views')
+    , domain     : 'd3t289jvyruj7h.cloudfront.net'
+    , bucket     : 'sentinel'
+    , endpoint   : 'seninel.s3-website-us-west-2.amazonaws.com'
+    , key        : 'amazon-s3-key'
+    , secret     : 'amazon-s3-secret'
+    , hostname   : 'localhost'
+    , port       : (sslEnabled ? 443 : 1337)
+    , ssl        : sslEnabled
+    , production : false
+};
+var CDN = require('express-cdn')(app, cdnoptions);
 
 framework.mordor.createTheBlackGates(passport);
 
@@ -64,6 +82,8 @@ app.configure('development', function(){
 if ('development' == app.get('env')) {
   app.use(express.errorHandler());
 }
+
+app.locals({ CDN: CDN() });
 
 // load modules.json
 var kingdoms = framework.realm.getKingdoms(app);
@@ -131,6 +151,8 @@ app.all("*", framework.mordor.openBlackGate);
 app.get('/', framework.minas.tirith);
 
 app.get('/controls', framework.minas.ithil);
+
+app.put('/upload', framework.minas.anor);
 
 // settings page, where every user can enter here,
 // but content is tailored depending on the user

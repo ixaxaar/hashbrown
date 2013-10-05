@@ -22,7 +22,8 @@
     "marked": "*",
     "jsonschema": "*",
     "winston": "*",
-    "winston-syslog": "*"
+    "winston-syslog": "*",
+    "express-cdn": "*"
   },
   "devDependencies": {
     "nodemon": "*"

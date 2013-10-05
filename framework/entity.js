@@ -49,7 +49,7 @@ var validateEmail = function(email) {
 //   Users
 ////////////////////////////////
 
-// @phobi, @pranaya - this is for you guys to decide ^_^
+
 var UserProfileSchema = new Schema({
     uid:        String,
     name:       String,

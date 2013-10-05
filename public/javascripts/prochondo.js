@@ -97,9 +97,9 @@ $('#tab-god').on('click', function() {
 
 // Profile tab
 
-$('#profileSubmit').on('click', function() {
-    return false;
-});
+//$('#profileSubmit').on('click', function() {
+//    return false;
+//});
 
 // Manage tab
 
